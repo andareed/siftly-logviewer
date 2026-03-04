@@ -1,0 +1,24 @@
+# Go build artifacts
+sfhost
+bin/
+
+# Logs and debug
+*.log
+debug.log
+testdata/
+
+# Example/test data
+hostlog.csv
+*.csv
+.coolnames.used
+*.json
+run*.sh
+!scripts/*.sh
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# build outputs
+dist/
+testdata/today.json

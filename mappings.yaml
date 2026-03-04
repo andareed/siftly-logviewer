@@ -1,0 +1,9 @@
+sw:
+  sw_mac_discovery_rate:
+    label: "Query discovery rate"
+  alert_status:
+    label: "Switch Alerts"
+  gen_status:
+    label: "Alerts"
+  sw_ignore_trunk:
+    label: "Detect endpoints connected to trunk ports"
