@@ -1,4 +1,5 @@
 VERSION       ?= $(shell git describe --tags --always --dirty)
+CGO_ENABLED   ?= 0
 DIST_DIR      := dist
 HOSTLOG_PKG   := ./cmd/hostlog
 PLUGINLOG_PKG := ./cmd/pluginlog
@@ -26,22 +27,22 @@ linux: linux-hostlog linux-pluginlog linux-todaylog linux-devfmt
 
 linux-hostlog:
 	mkdir -p $(DIST_DIR)
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_HOSTLOG)" \
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_HOSTLOG)" \
 		-o $(DIST_DIR)/hostlog_$(VERSION)_linux_amd64 $(HOSTLOG_PKG)
 
 linux-pluginlog:
 	mkdir -p $(DIST_DIR)
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_PLUGINLOG)" \
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_PLUGINLOG)" \
 		-o $(DIST_DIR)/pluginlog_$(VERSION)_linux_amd64 $(PLUGINLOG_PKG)
 
 linux-todaylog:
 	mkdir -p $(DIST_DIR)
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_TODAYLOG)" \
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_TODAYLOG)" \
 		-o $(DIST_DIR)/todaylog_$(VERSION)_linux_amd64 $(TODAYLOG_PKG)
 
 linux-devfmt:
 	mkdir -p $(DIST_DIR)
-	GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_DEVFMT)" \
+	CGO_ENABLED=$(CGO_ENABLED) GOOS=linux GOARCH=amd64 go build -ldflags "$(LDFLAGS_DEVFMT)" \
 		-o $(DIST_DIR)/devfmt_$(VERSION)_linux_amd64 $(DEVFMT_PKG)
 
 windows: windows-hostlog windows-pluginlog windows-todaylog windows-devfmt

@@ -7,7 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func Run(inputPath, debugLogPath string) error {
+func Run(inputPath, debugLogPath, filterPresetsPath, filterHistoryPath string) error {
 	cleanup, err := logging.SetupLogging(debugLogPath)
 	if err != nil {
 		return fmt.Errorf("setup logging: %w", err)
@@ -20,6 +20,7 @@ func Run(inputPath, debugLogPath string) error {
 	if err != nil {
 		return fmt.Errorf("load %q: %w", inputPath, err)
 	}
+	configureFilterConfig(m, filterPresetsPath, filterHistoryPath)
 
 	if _, err = tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
 		return fmt.Errorf("tea program: %w", err)

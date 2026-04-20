@@ -23,6 +23,12 @@ go build -o ./dist/devfmt ./cmd/devfmt
 - `pluginlog`: Opens plugin log files (`.log` or `.json`)
 - `devfmt`: Device info viewer with subcommands (`list-groups`, `list-categories`, `show`, `export`)
 
+Default preset files in the project root:
+- `hostlog-filters.json`
+- `todaylog-filters.json`
+- `pluginlog-filters.json`
+- `devfmt-filters.json`
+
 [SCREENSHOT: app-quick-map]
 `Optional screenshot of this section or a terminal help output`
 
@@ -261,4 +267,3 @@ Examples:
 - `[ ]` Columns/sort/order commands
 - `[ ]` Time window panel
 - `[ ]` Save + export dialogs
-

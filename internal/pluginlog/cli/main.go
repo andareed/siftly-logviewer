@@ -30,7 +30,12 @@ func Run() {
 				return cli.Exit("", 1)
 			}
 
-			return pluginlog.Run(inputPath, c.String("debug"))
+			return pluginlog.Run(
+				inputPath,
+				c.String("debug"),
+				c.String("filter-presets"),
+				c.String("filter-history"),
+			)
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -41,6 +46,14 @@ func Run() {
 				Name:    "input",
 				Aliases: []string{"i"},
 				Usage:   "Path to input file (.log or .json)",
+			},
+			&cli.StringFlag{
+				Name:  "filter-presets",
+				Usage: "Path to app-specific filter presets JSON (default: pluginlog-filters.json)",
+			},
+			&cli.StringFlag{
+				Name:  "filter-history",
+				Usage: "Path to writable filter history JSON (default: pluginlog-filter-history.json)",
 			},
 			&cli.BoolFlag{
 				Name:  "version",

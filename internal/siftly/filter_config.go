@@ -3,17 +3,31 @@ package siftly
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 const (
-	filterConfigFile = "filters.json"
 	maxFilterHistory = 50
 )
 
 type FilterConfig struct {
+	Presets PresetList
+	History []string
+}
+
+type FilterPresetConfig struct {
 	Presets PresetList `json:"presets"`
-	History []string   `json:"history"`
+}
+
+type FilterHistoryConfig struct {
+	History []string `json:"history"`
+}
+
+type FilterConfigSettings struct {
+	DefaultPresets PresetList
+	PresetsPath    string
+	HistoryPath    string
 }
 
 type Preset struct {
@@ -23,75 +37,107 @@ type Preset struct {
 
 type PresetList []Preset
 
-func filterConfigPath() string {
-	return filterConfigFile
+func (m *Model) SetFilterConfig(settings FilterConfigSettings) {
+	m.filterConfig = normalizeFilterConfigSettings(settings)
 }
 
-func defaultFilterConfig() FilterConfig {
-	return FilterConfig{
-		Presets: PresetList{
-			{
-				Pattern:     "(?i)OS Classification Score - -1|Function Classification Score - -1",
-				Description: "Classification failures: score is -1 in Details",
-			},
-			{
-				Pattern:     "(?i)Failed to learn .* : No updated classification\\.",
-				Description: "Failed-to-learn details where classification was not updated",
-			},
-			{
-				Pattern:     "(?i)Label Active Test.*DHTestLabel.*Executing action - Add Label\\. Details:",
-				Description: "Long policy details: executing Add Label action",
-			},
-			{
-				Pattern:     "(?i)Label Active Test.*Host evaluation changed from .*Duration: 5 minutes",
-				Description: "Long evaluation details with transition and duration",
-			},
-			{
-				Pattern:     "(?i)Assigned Label - Assigned Label no longer includes DHTestLabel; Context: Removed by plugin Advanced Tools",
-				Description: "Property details for label removal context",
-			},
-			{
-				Pattern:     "(?i)NIC Vendor Value - Property value cleared: NIC Vendor Value - .*; Context: Purger",
-				Description: "Property value cleared events from Purger context",
-			},
-		},
-		History: []string{},
-	}
+func normalizeFilterConfigSettings(settings FilterConfigSettings) FilterConfigSettings {
+	settings.DefaultPresets = normalizePresetList(settings.DefaultPresets)
+	settings.PresetsPath = strings.TrimSpace(settings.PresetsPath)
+	settings.HistoryPath = strings.TrimSpace(settings.HistoryPath)
+	return settings
 }
 
-func LoadFilterConfig(path string) (FilterConfig, error) {
+func LoadFilterPresetConfig(path string) (FilterPresetConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return defaultFilterConfig(), nil
-		}
-		return FilterConfig{}, err
+		return FilterPresetConfig{}, err
 	}
 
-	var cfg FilterConfig
+	var cfg FilterPresetConfig
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return FilterConfig{}, err
+		return FilterPresetConfig{}, err
 	}
-	normalizeFilterConfig(&cfg)
+	cfg.Presets = normalizePresetList(cfg.Presets)
 	return cfg, nil
 }
 
-func SaveFilterConfig(path string, cfg FilterConfig) error {
-	normalizeFilterConfig(&cfg)
+func LoadFilterHistoryConfig(path string) (FilterHistoryConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return FilterHistoryConfig{}, err
+	}
+
+	var cfg FilterHistoryConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return FilterHistoryConfig{}, err
+	}
+	cfg.History = normalizeFilterList(cfg.History)
+	return cfg, nil
+}
+
+func SaveFilterHistoryConfig(path string, cfg FilterHistoryConfig) error {
+	cfg.History = normalizeFilterList(cfg.History)
 	data, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
 		return err
 	}
 	data = append(data, '\n')
+	if dir := filepath.Dir(path); dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
 	return os.WriteFile(path, data, 0644)
 }
 
-func normalizeFilterConfig(cfg *FilterConfig) {
-	if cfg == nil {
-		return
+func (m Model) loadFilterConfig() (FilterConfig, error) {
+	settings := normalizeFilterConfigSettings(m.filterConfig)
+	cfg := FilterConfig{
+		Presets: append(PresetList(nil), settings.DefaultPresets...),
+		History: []string{},
 	}
-	cfg.Presets = normalizePresetList(cfg.Presets)
-	cfg.History = normalizeFilterList(cfg.History)
+
+	if settings.PresetsPath != "" {
+		fileCfg, err := LoadFilterPresetConfig(settings.PresetsPath)
+		if err != nil && !os.IsNotExist(err) {
+			return FilterConfig{}, err
+		}
+		cfg.Presets = mergePresetLists(cfg.Presets, fileCfg.Presets)
+	}
+
+	if settings.HistoryPath != "" {
+		historyCfg, err := LoadFilterHistoryConfig(settings.HistoryPath)
+		if err != nil && !os.IsNotExist(err) {
+			return FilterConfig{}, err
+		}
+		cfg.History = historyCfg.History
+	}
+
+	return cfg, nil
+}
+
+func mergePresetLists(base, overlay PresetList) PresetList {
+	out := append(PresetList(nil), normalizePresetList(base)...)
+	if len(overlay) == 0 {
+		return out
+	}
+
+	indexByPattern := make(map[string]int, len(out))
+	for i, item := range out {
+		indexByPattern[item.Pattern] = i
+	}
+
+	for _, item := range normalizePresetList(overlay) {
+		if idx, ok := indexByPattern[item.Pattern]; ok {
+			out[idx] = item
+			continue
+		}
+		indexByPattern[item.Pattern] = len(out)
+		out = append(out, item)
+	}
+
+	return out
 }
 
 func normalizePresetList(list PresetList) PresetList {

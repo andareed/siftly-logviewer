@@ -75,7 +75,13 @@ func Run() {
 						Search:   c.String("search"),
 						SortID:   c.Bool("sort"),
 					}
-					return devfmt.Run(inputPath, c.String("debug"), q)
+					return devfmt.Run(
+						inputPath,
+						c.String("debug"),
+						q,
+						c.String("filter-presets"),
+						c.String("filter-history"),
+					)
 				},
 			},
 			{
@@ -130,7 +136,13 @@ func runExportLike(c *cli.Command) error {
 		q.Group = group
 	}
 
-	return devfmt.Run(inputPath, c.String("debug"), q)
+	return devfmt.Run(
+		inputPath,
+		c.String("debug"),
+		q,
+		c.String("filter-presets"),
+		c.String("filter-history"),
+	)
 }
 
 func isTTY(f *os.File) bool {
@@ -178,6 +190,14 @@ func commonFlags() []cli.Flag {
 			Aliases: []string{"i"},
 			Usage:   "Path to input dump file (use - or omit to read stdin)",
 		},
+		&cli.StringFlag{
+			Name:  "filter-presets",
+			Usage: "Path to app-specific filter presets JSON (default: devfmt-filters.json)",
+		},
+		&cli.StringFlag{
+			Name:  "filter-history",
+			Usage: "Path to writable filter history JSON (default: devfmt-filter-history.json)",
+		},
 		&cli.StringFlag{Name: "group", Usage: "group_category exact match"},
 		&cli.StringFlag{Name: "category", Usage: "Raw category exact match (debug)"},
 		&cli.StringFlag{Name: "id", Usage: "Entity id exact match"},
@@ -197,6 +217,14 @@ func commandInputFlags() []cli.Flag {
 			Name:    "input",
 			Aliases: []string{"i"},
 			Usage:   "Path to input dump file (use - or omit to read stdin)",
+		},
+		&cli.StringFlag{
+			Name:  "filter-presets",
+			Usage: "Path to app-specific filter presets JSON (default: devfmt-filters.json)",
+		},
+		&cli.StringFlag{
+			Name:  "filter-history",
+			Usage: "Path to writable filter history JSON (default: devfmt-filter-history.json)",
 		},
 	}
 }

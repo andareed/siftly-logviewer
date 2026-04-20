@@ -31,6 +31,7 @@ type Model struct {
 	terminalWidth       int
 	pageRowSize         int
 	activeDialog        dialogs.Dialog
+	filterConfig        FilterConfigSettings
 	fileName            string // filename the data will be saved to
 	InitialPath         string
 	lastExportFileName  string

@@ -106,7 +106,7 @@ func runCommentCommand(m *Model, raw string) tea.Cmd {
 
 func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.view.command.cmd == CmdFilter && msg.String() == "ctrl+p" {
-		cfg, err := LoadFilterConfig(filterConfigPath())
+		cfg, err := m.loadFilterConfig()
 		if err != nil {
 			return m, m.view.notice.Start("Filter presets error", "warn", noticeDuration)
 		}
