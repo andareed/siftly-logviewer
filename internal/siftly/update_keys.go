@@ -29,7 +29,7 @@ const (
 	viewActionPrevMark
 	viewActionSearchNext
 	viewActionSearchPrev
-	viewActionClearFilter
+	viewActionToggleFilter
 	viewActionToggleGraph
 	viewActionRowDown
 	viewActionRowUp
@@ -154,11 +154,17 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			cmd = m.view.notice.Start("No matches", "warn", noticeDuration)
 		}
 		m.ready = true
-	case viewActionClearFilter:
-		// Clear Filter
-		logging.Infof("Shift F, clearing Filter")
-		m.setFilterPattern("") // Set the filter to nothing which will clear
-		cmd = m.view.notice.Start("Cleared filter", "", noticeDuration)
+	case viewActionToggleFilter:
+		logging.Infof("Shift F, toggling Filter")
+		if !m.toggleFilter() {
+			cmd = m.view.notice.Start("No filter configured", "warn", noticeDuration)
+			break
+		}
+		if m.table.filterEnabled {
+			cmd = m.view.notice.Start("Filter enabled", "", noticeDuration)
+		} else {
+			cmd = m.view.notice.Start("Filter disabled", "", noticeDuration)
+		}
 	case viewActionToggleGraph:
 		if m.graphConfig.Enabled {
 			m.view.graphWindow.Open = !m.view.graphWindow.Open
@@ -233,8 +239,8 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionSearchNext
 	case key.Matches(msg, Keys.SearchPrev):
 		return viewActionSearchPrev
-	case key.Matches(msg, Keys.ClearFilter):
-		return viewActionClearFilter
+	case key.Matches(msg, Keys.ToggleFilter):
+		return viewActionToggleFilter
 	case key.Matches(msg, Keys.ToggleGraph):
 		return viewActionToggleGraph
 	case key.Matches(msg, Keys.RowDown):

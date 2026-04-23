@@ -113,8 +113,8 @@ func (m *Model) commandHintsLine(cmd Command) string { return lookupCommandMeta(
 func (m *Model) commandSeed(cmd Command) string {
 	switch cmd {
 	case CmdFilter:
-		if m.table.filterRegex != nil {
-			return m.table.filterRegex.String()
+		if m.table.filterPattern != "" {
+			return m.table.filterPattern
 		}
 		return ""
 	case CmdSort:

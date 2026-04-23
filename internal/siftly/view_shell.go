@@ -200,10 +200,7 @@ func (m *Model) currentPanelStatus() panelStatusSpec {
 		}
 	}
 
-	filterValue := ""
-	if m.table.filterRegex != nil {
-		filterValue = strings.TrimSpace(m.table.filterRegex.String())
-	}
+	filterValue := m.filterStatusValue()
 	return panelStatusSpec{
 		CurrentRow: currentRow,
 		TotalRows:  totalRows,
@@ -256,14 +253,10 @@ func (m *Model) metaStatusView(width int) string {
 		}
 	}
 
-	filterValue := ""
-	filterActive := false
-	if m.table.filterRegex != nil {
-		filterValue = strings.TrimSpace(m.table.filterRegex.String())
-		filterActive = filterValue != "" && !strings.EqualFold(filterValue, "none")
-	}
+	filterValue := m.filterStatusValue()
+	filterConfigured := filterValue != "" && !strings.EqualFold(filterValue, "none")
 
-	stateBlock := renderMetaStateBlock(width, currentRow, totalRows, filterValue, filterActive, m.table.showOnlyMarked)
+	stateBlock := renderMetaStateBlock(width, currentRow, totalRows, filterValue, filterConfigured, m.table.showOnlyMarked)
 	stateWidth := lipgloss.Width(stateBlock)
 	leftWidth := width - stateWidth
 	if leftWidth <= 0 {

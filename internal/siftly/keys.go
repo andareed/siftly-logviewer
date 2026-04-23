@@ -13,7 +13,7 @@ type Keymap struct {
 	Filter        key.Binding
 	Sort          key.Binding
 	Search        key.Binding
-	ClearFilter   key.Binding
+	ToggleFilter  key.Binding
 	SearchNext    key.Binding
 	SearchPrev    key.Binding
 	TimeWindowSet key.Binding
@@ -84,9 +84,9 @@ var Keys = Keymap{
 		key.WithKeys("/"),
 		key.WithHelp("/", "Search"),
 	),
-	ClearFilter: key.NewBinding(
+	ToggleFilter: key.NewBinding(
 		key.WithKeys("F"),
-		key.WithHelp("F", "Clear current filter"),
+		key.WithHelp("F", "Toggle current filter"),
 	),
 	SearchNext: key.NewBinding(
 		key.WithKeys("n"),
@@ -179,7 +179,7 @@ func (k Keymap) Legend(graphEnabled bool) []key.Binding {
 		k.PrevMark,
 		k.Filter,
 		k.Search,
-		k.ClearFilter,
+		k.ToggleFilter,
 		k.SearchNext,
 		k.SearchPrev,
 		k.TimeOps,

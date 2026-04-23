@@ -133,7 +133,7 @@ Useful discovery commands:
 1. Press `f`
 2. Type regex pattern
 3. Press `Enter` to apply
-4. Press `F` to clear filter
+4. Press `F` to toggle the current filter on/off
 5. Optional: inside filter mode press `Ctrl+P` to open filter palette presets/history
 
 [SCREENSHOT: filter-command]

@@ -43,13 +43,15 @@ func TestMetaStatusViewWithFilter(t *testing.T) {
 		fileName: "hostlog.json",
 		cursor:   5,
 		table: tableState{
-			filterRegex:     regexp.MustCompile(`severity=error`),
+			filterPattern:   "severity=error",
+			filterEnabled:   true,
+			filterRegex:     mustCompileFilter(t, `severity=error`),
 			filteredIndices: make([]int, 300),
 		},
 	}
 
-	got := stripANSI(m.metaStatusView(80))
-	wantSuffix := "Rows 6/300  Filter: severity=error"
+	got := stripANSI(m.metaStatusView(90))
+	wantSuffix := "Rows 6/300  Filter: severity=error (on)"
 	if !strings.HasSuffix(got, wantSuffix) {
 		t.Fatalf("right block mismatch: got %q want suffix %q", got, wantSuffix)
 	}
@@ -64,13 +66,34 @@ func TestMetaStatusViewWithFilterAndMarks(t *testing.T) {
 		cursor:   5,
 		table: tableState{
 			showOnlyMarked:  true,
-			filterRegex:     regexp.MustCompile(`severity=error`),
+			filterPattern:   "severity=error",
+			filterEnabled:   true,
+			filterRegex:     mustCompileFilter(t, `severity=error`),
 			filteredIndices: make([]int, 300),
 		},
 	}
 
-	got := stripANSI(m.metaStatusView(100))
-	wantSuffix := "Rows 6/300  Filter: severity=error  Marks: on"
+	got := stripANSI(m.metaStatusView(110))
+	wantSuffix := "Rows 6/300  Filter: severity=error (on)  Marks: on"
+	if !strings.HasSuffix(got, wantSuffix) {
+		t.Fatalf("right block mismatch: got %q want suffix %q", got, wantSuffix)
+	}
+}
+
+func TestMetaStatusViewWithDisabledFilter(t *testing.T) {
+	m := Model{
+		fileName: "hostlog.json",
+		cursor:   5,
+		table: tableState{
+			filterPattern:   "severity=error",
+			filterEnabled:   false,
+			filterRegex:     mustCompileFilter(t, `severity=error`),
+			filteredIndices: make([]int, 300),
+		},
+	}
+
+	got := stripANSI(m.metaStatusView(82))
+	wantSuffix := "Rows 6/300  Filter: severity=error (off)"
 	if !strings.HasSuffix(got, wantSuffix) {
 		t.Fatalf("right block mismatch: got %q want suffix %q", got, wantSuffix)
 	}

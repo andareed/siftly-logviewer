@@ -9,7 +9,8 @@ func (m *Model) applyFilter() {
 	currentRowHash := m.currentRowHashID()                // should be called before we reset the filtered indices
 	m.table.filteredIndices = m.table.filteredIndices[:0] // reset slice
 
-	if m.table.filterRegex == nil && !m.table.showOnlyMarked && !m.table.timeWindow.Enabled {
+	filterActive := m.table.filterEnabled && m.table.filterRegex != nil
+	if !filterActive && !m.table.showOnlyMarked && !m.table.timeWindow.Enabled {
 		logging.Debug("applyFilter: no active filters; adding all indices")
 		for i := range m.table.rows {
 			m.table.filteredIndices = append(m.table.filteredIndices, i)

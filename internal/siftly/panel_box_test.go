@@ -27,7 +27,7 @@ func TestRenderBoxedPanelWideFilterActive(t *testing.T) {
 		panelStatusSpec{
 			CurrentRow: 0,
 			TotalRows:  0,
-			Filter:     "My filter",
+			Filter:     "My filter (on)",
 			MarksOn:    false,
 		},
 		[]string{
@@ -43,7 +43,7 @@ func TestRenderBoxedPanelWideFilterActive(t *testing.T) {
 	if !strings.Contains(lines[0], "hostlog.json") {
 		t.Fatalf("missing filename in top border: %q", lines[0])
 	}
-	if !strings.Contains(lines[0], "Rows 0/0  Filter: My filter") {
+	if !strings.Contains(lines[0], "Rows 0/0  Filter: My filter (on)") {
 		t.Fatalf("missing right status in top border: %q", lines[0])
 	}
 }
