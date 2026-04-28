@@ -50,6 +50,9 @@ func (m *Model) handleWindowMsg(msg tea.Msg) (tea.Cmd, bool) {
 	m.viewport = viewport.New(0, 0) // TODO: Pretty sure this is redundant
 	m.ready = true
 	m.refreshView("window-size", true)
+	if m.view.mainBodySnapshotActive {
+		m.captureMainBodySnapshot(m.panelWidth())
+	}
 	return nil, true
 }
 
@@ -109,6 +112,7 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 		m.view.command.cmd = CmdFilter
 		m.view.mode = modeCommand
 		m.view.command.buf = action.Pattern
+		m.captureMainBodySnapshot(m.panelWidth())
 		return nil
 	case dialogs.ActionFilterCancel:
 		m.hideActiveDialog()

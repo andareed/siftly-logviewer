@@ -27,6 +27,10 @@ type graphRenderCache struct {
 type viewState struct {
 	mode                    mode
 	command                 CommandInput
+	mainBodySnapshotActive  bool
+	mainBodySnapshot        string
+	mainBodySnapshotWidth   int
+	mainBodySnapshotHeight  int
 	modeHintSeq             int
 	prefixHintSeq           int
 	graphWindow             featuregraph.Window

@@ -130,6 +130,15 @@ func (m *Model) commandSeed(cmd Command) string {
 	}
 }
 
+func commandUsesMainBodySnapshot(cmd Command) bool {
+	switch cmd {
+	case CmdJump, CmdSearch, CmdFilter, CmdSort, CmdComment, CmdColumns, CmdColumnOrder:
+		return true
+	default:
+		return false
+	}
+}
+
 // activeCommandLine returns the command prompt text for the footer status line.
 func (m *Model) activeCommandLine() string {
 	badge := m.commandBadge(m.view.command.cmd)
@@ -151,6 +160,9 @@ func (m *Model) enterCommand(cmd Command, seed string, showHint bool, refresh bo
 	if refresh {
 		m.refreshView("enter-command", false)
 	}
+	if commandUsesMainBodySnapshot(cmd) {
+		m.captureMainBodySnapshot(m.panelWidth())
+	}
 	if showHint {
 		m.setModeHint(m.commandHintsLine(cmd))
 		return nil
@@ -160,6 +172,7 @@ func (m *Model) enterCommand(cmd Command, seed string, showHint bool, refresh bo
 
 func (m *Model) exitCommand(refresh bool) tea.Cmd {
 	m.clearModeHint()
+	m.clearMainBodySnapshot()
 	m.view.command = CommandInput{}
 	m.view.mode = modeView
 	if refresh {

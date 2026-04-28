@@ -125,10 +125,36 @@ func (m *Model) View() string {
 		)
 	}
 
-	panelW := m.viewport.Width + 4
-	if panelW < panelMinOuterCols {
-		panelW = panelMinOuterCols
+	panelW := m.panelWidth()
+	body := m.mainBodyForView(panelW)
+	base := m.appFrameView(body, panelW)
+	if m.view.mode != modeTimeWindow || !m.view.timeWindow.Open {
+		return base
 	}
+	return m.renderTimeWindowDialog(base)
+}
+
+func (m *Model) mainBodyForView(panelW int) string {
+	if m.view.mainBodySnapshotActive {
+		if !m.mainBodySnapshotValid(panelW) {
+			m.captureMainBodySnapshot(panelW)
+		}
+		return m.view.mainBodySnapshot
+	}
+	return m.mainBodyView(panelW)
+}
+
+func (m *Model) mainBodySnapshotValid(panelW int) bool {
+	return m.view.mainBodySnapshot != "" &&
+		m.view.mainBodySnapshotWidth == panelW &&
+		m.view.mainBodySnapshotHeight == m.terminalHeight
+}
+
+func (m *Model) appFrameView(body string, panelW int) string {
+	return m.styles.App.Render(lipgloss.JoinVertical(lipgloss.Left, body, m.footerView(panelW)))
+}
+
+func (m *Model) mainBodyView(panelW int) string {
 	panel := m.mainPanelView(panelW)
 
 	graphBlock := ""
@@ -149,12 +175,7 @@ func (m *Model) View() string {
 	if m.view.drawerOpen {
 		parts = append(parts, drawer)
 	}
-	parts = append(parts, m.footerView(panelW))
-	base := m.styles.App.Render(lipgloss.JoinVertical(lipgloss.Left, parts...))
-	if m.view.mode != modeTimeWindow || !m.view.timeWindow.Open {
-		return base
-	}
-	return m.renderTimeWindowDialog(base)
+	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }
 
 func (m *Model) mainPanelView(panelWidth int) string {
