@@ -19,6 +19,7 @@ func (m *Model) setFilterPattern(pattern string) error {
 		m.table.filterPattern = pattern
 		m.table.filterEnabled = true
 		m.table.filterRegex = re
+		m.table.filterWholeRow = filterRequiresWholeRow(pattern)
 		m.applyFilter()
 	}
 	return nil
@@ -28,6 +29,7 @@ func (m *Model) clearFilter() {
 	m.table.filterPattern = ""
 	m.table.filterEnabled = false
 	m.table.filterRegex = nil
+	m.table.filterWholeRow = false
 	m.applyFilter()
 }
 
@@ -79,10 +81,28 @@ func (m *Model) includeRowWithFilter(row Row, rowIndex int, re *regexp.Regexp) b
 	}
 
 	if m.table.filterEnabled && re != nil {
-		match := re.MatchString(row.String())
+		match := row.MatchesColumns(re, m.table.searchColumns)
+		if !match && m.table.filterWholeRow {
+			match = re.MatchString(row.String())
+		}
 		if !match {
 			return false
 		}
 	}
 	return true
+}
+
+func filterRequiresWholeRow(pattern string) bool {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return false
+	}
+
+	if strings.Contains(pattern, "\t") || strings.Contains(pattern, `\t`) {
+		return true
+	}
+	if strings.Contains(pattern, `\A`) || strings.Contains(pattern, `\z`) || strings.Contains(pattern, `\Z`) {
+		return true
+	}
+	return strings.HasPrefix(pattern, "^") || strings.HasSuffix(pattern, "$")
 }

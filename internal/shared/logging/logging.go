@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -100,6 +101,13 @@ func Error(args ...any) { logf(LevelError, "ERROR", "%s", fmt.Sprint(args...)) }
 
 func Fatalf(format string, args ...any) {
 	log.Fatalf("[FATAL] "+format, args...)
+}
+
+func TimeOperation(label string) func() {
+	start := time.Now()
+	return func() {
+		Infof("%s took %s", label, time.Since(start).Round(time.Millisecond))
+	}
 }
 
 func logf(level Level, prefix, format string, args ...any) {

@@ -107,6 +107,8 @@ func (m *Model) resetViewLayoutState() tea.Cmd {
 	m.table.sortEnabled = false
 	m.table.sortColumn = -1
 	m.table.sortDesc = false
+	m.rebuildRowOrder()
+	m.applyFilter()
 	m.viewport.ScrollLeft(1 << 20)
 	m.refreshView("reset-view-layout", true)
 	return m.view.notice.Start("Reset view: visibility, sort, order", "", noticeDuration)

@@ -101,3 +101,25 @@ func TestClearFilterResetsPatternAndDisabledState(t *testing.T) {
 		t.Fatalf("filtered rows after clear = %d want 2", got)
 	}
 }
+
+func TestFilterFallsBackToWholeRowMatchingWhenPatternNeedsIt(t *testing.T) {
+	m := Model{
+		table: tableState{
+			rows: testRows(),
+		},
+	}
+
+	if err := m.setFilterPattern(`^severity=error\thost=a$`); err != nil {
+		t.Fatalf("set filter: %v", err)
+	}
+
+	if !m.table.filterWholeRow {
+		t.Fatalf("filter should require whole-row matching")
+	}
+	if got := len(m.table.filteredIndices); got != 1 {
+		t.Fatalf("filtered rows after whole-row match = %d want 1", got)
+	}
+	if got := m.table.filteredIndices[0]; got != 0 {
+		t.Fatalf("matched row index = %d want 0", got)
+	}
+}

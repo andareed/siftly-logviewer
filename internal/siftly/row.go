@@ -1,7 +1,7 @@
 package siftly
 
 import (
-	"hash/fnv"
+	"regexp"
 	"strings"
 )
 
@@ -13,13 +13,16 @@ type Row struct {
 }
 
 func (r Row) ComputeID() uint64 {
-	h := fnv.New64a()
+	var h uint64 = 14695981039346656037
 	for _, col := range r.Cols {
 		norm := strings.ToLower(strings.TrimSpace(col))
-		h.Write([]byte(norm))
-		h.Write([]byte{0})
+		for i := 0; i < len(norm); i++ {
+			h ^= uint64(norm[i])
+			h *= 1099511628211
+		}
+		h *= 1099511628211
 	}
-	return h.Sum64()
+	return h
 }
 
 func (r Row) Join(sep string) string {
@@ -31,6 +34,31 @@ func (r Row) Join(sep string) string {
 		b.WriteString(col)
 	}
 	return b.String()
+}
+
+func (r Row) MatchesColumns(re *regexp.Regexp, order []int) bool {
+	if re == nil {
+		return true
+	}
+
+	if len(order) == 0 {
+		for _, col := range r.Cols {
+			if re.MatchString(col) {
+				return true
+			}
+		}
+		return false
+	}
+
+	for _, idx := range order {
+		if idx < 0 || idx >= len(r.Cols) {
+			continue
+		}
+		if re.MatchString(r.Cols[idx]) {
+			return true
+		}
+	}
+	return false
 }
 
 // String implements fmt.Stringer using tab as the default delimiter.

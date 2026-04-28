@@ -149,3 +149,41 @@ func TestCompareColumnValues(t *testing.T) {
 		})
 	}
 }
+
+func TestSetSortSpecKeepsFilteredRowsInSortedOrder(t *testing.T) {
+	rows := []Row{
+		{Cols: []string{"charlie", "ops"}, OriginalIndex: 1},
+		{Cols: []string{"alpha", "ops"}, OriginalIndex: 2},
+		{Cols: []string{"delta", "sales"}, OriginalIndex: 3},
+	}
+	for i := range rows {
+		rows[i].ID = rows[i].ComputeID()
+	}
+
+	m := Model{
+		table: tableState{
+			header: []ui.ColumnMeta{
+				{Name: "Name", Index: 0, Visible: true},
+				{Name: "Team", Index: 1, Visible: true},
+			},
+			rows: rows,
+		},
+	}
+
+	if err := m.setSortSpec("Name asc"); err != nil {
+		t.Fatalf("set sort: %v", err)
+	}
+	if err := m.setFilterPattern(`ops`); err != nil {
+		t.Fatalf("set filter: %v", err)
+	}
+
+	want := []int{1, 0}
+	if len(m.table.filteredIndices) != len(want) {
+		t.Fatalf("filtered row count = %d want %d", len(m.table.filteredIndices), len(want))
+	}
+	for i, idx := range want {
+		if got := m.table.filteredIndices[i]; got != idx {
+			t.Fatalf("filtered row %d = %d want %d", i, got, idx)
+		}
+	}
+}

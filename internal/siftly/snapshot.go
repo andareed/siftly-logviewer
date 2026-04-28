@@ -245,6 +245,24 @@ func LoadModel(m *Model, path string) error {
 	for _, dr := range dto.Rows {
 		m.table.rows = append(m.table.rows, fromDTORow(dr))
 	}
+	m.table.showOnlyMarked = false
+	m.table.filterPattern = ""
+	m.table.filterEnabled = false
+	m.table.filterRegex = nil
+	m.table.filterWholeRow = false
+	m.table.filteredIndices = nil
+	m.table.sortEnabled = false
+	m.table.sortColumn = -1
+	m.table.sortDesc = false
+	m.table.rowOrder = nil
+	m.table.searchColumns = nil
+	m.table.rowTimes = nil
+	m.table.rowHasTimes = nil
+	m.table.hasTimeBounds = false
+	m.table.timeMin = time.Time{}
+	m.table.timeMax = time.Time{}
+	m.table.timeColumnIndex = -1
+	m.table.derivedTimeData = false
 
 	// Restore marks/comments
 	var errMarks, errComments error

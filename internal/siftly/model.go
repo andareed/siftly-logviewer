@@ -58,6 +58,7 @@ func (m *Model) SetGraphConfig(cfg GraphConfig) {
 }
 
 func (m *Model) InitialiseView() {
+	m.ensureTableDerivedState()
 	m.table.showOnlyMarked = false
 	m.drawerPort = viewport.New(0, 0)
 	m.view.drawerHeight = 13 // TODO:should be a better way of calcing this rather than hardcoding
@@ -74,6 +75,7 @@ func (m *Model) InitialiseView() {
 }
 
 func (m *Model) Init() tea.Cmd {
+	defer logging.TimeOperation("initial filter")()
 	m.applyFilter()
 	logging.Info("siftly-hostlog: Initialised")
 	return nil

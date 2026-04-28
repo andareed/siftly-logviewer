@@ -3,6 +3,7 @@ package siftly
 import (
 	"time"
 
+	"github.com/andareed/siftly-hostlog/internal/shared/logging"
 	featuretimewindow "github.com/andareed/siftly-hostlog/internal/siftly/features/timewindow"
 )
 
@@ -33,6 +34,12 @@ func (m *Model) initTimeWindowState() {
 }
 
 func (m *Model) computeTimeBounds() {
+	if m.table.derivedTimeData && len(m.table.rowTimes) == len(m.table.rows) && len(m.table.rowHasTimes) == len(m.table.rows) {
+		return
+	}
+
+	defer logging.TimeOperation("compute time bounds")()
+
 	header := make([]string, len(m.table.header))
 	for i := range m.table.header {
 		header[i] = m.table.header[i].Name
@@ -49,6 +56,7 @@ func (m *Model) computeTimeBounds() {
 	m.table.hasTimeBounds = bounds.Has
 	m.table.timeMin = bounds.Min
 	m.table.timeMax = bounds.Max
+	m.table.derivedTimeData = true
 }
 
 func (m *Model) cursorTimestamp() (time.Time, bool) {

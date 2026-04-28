@@ -17,10 +17,13 @@ type tableState struct {
 	filterPattern   string
 	filterEnabled   bool
 	filterRegex     *regexp.Regexp
+	filterWholeRow  bool
 	filteredIndices []int // to store the list of indicides that match the current regex
 	sortEnabled     bool
 	sortColumn      int
 	sortDesc        bool
+	rowOrder        []int
+	searchColumns   []int
 	timeWindow      featuretimewindow.Window
 	timeMin         time.Time
 	timeMax         time.Time
@@ -28,4 +31,22 @@ type tableState struct {
 	timeColumnIndex int
 	rowTimes        []time.Time
 	rowHasTimes     []bool
+	derivedTimeData bool
+}
+
+func (m *Model) ensureTableDerivedState() {
+	if len(m.table.rowOrder) != len(m.table.rows) {
+		m.table.rowOrder = makeIndexRange(len(m.table.rows))
+	}
+
+	if len(m.table.header) > 0 {
+		if len(m.table.searchColumns) != len(m.table.header) {
+			m.table.searchColumns = buildSearchColumnOrder(m.table.header)
+		}
+		return
+	}
+
+	if len(m.table.searchColumns) == 0 && len(m.table.rows) > 0 {
+		m.table.searchColumns = makeIndexRange(len(m.table.rows[0].Cols))
+	}
 }

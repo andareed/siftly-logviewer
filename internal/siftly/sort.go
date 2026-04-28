@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/shared/logging"
 	featuretimewindow "github.com/andareed/siftly-hostlog/internal/siftly/features/timewindow"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 )
@@ -33,6 +34,7 @@ func (m *Model) setSortSpec(input string) error {
 		m.table.sortDesc = false
 	}
 
+	m.rebuildRowOrder()
 	m.applyFilter()
 	return nil
 }
@@ -66,16 +68,19 @@ func (m *Model) sortedHeaderName(col ui.ColumnMeta) string {
 	return name + " ↑"
 }
 
-func (m *Model) applyActiveSort() {
-	if !m.table.sortEnabled || len(m.table.filteredIndices) < 2 {
+func (m *Model) rebuildRowOrder() {
+	defer logging.TimeOperation("rebuild row order")()
+
+	m.table.rowOrder = makeIndexRange(len(m.table.rows))
+	if !m.table.sortEnabled || len(m.table.rowOrder) < 2 {
 		return
 	}
 
 	column := m.table.sortColumn
 	desc := m.table.sortDesc
-	sort.SliceStable(m.table.filteredIndices, func(i, j int) bool {
-		leftRow := m.table.filteredIndices[i]
-		rightRow := m.table.filteredIndices[j]
+	sort.SliceStable(m.table.rowOrder, func(i, j int) bool {
+		leftRow := m.table.rowOrder[i]
+		rightRow := m.table.rowOrder[j]
 		cmp := m.compareRowsByColumn(leftRow, rightRow, column)
 		if cmp == 0 {
 			return false
