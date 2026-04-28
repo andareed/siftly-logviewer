@@ -1,7 +1,9 @@
 package todaylog
 
 import (
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/andareed/siftly-hostlog/internal/siftly"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
@@ -55,6 +57,7 @@ func todaylogColumnSchema() siftly.ColumnSchema {
 		DefaultMinWidth: 8,
 		DefaultWeight:   1.0,
 		RoleForName:     detectRole,
+		TimeParser:      parseTodaylogUnixSeconds,
 		RoleDefaults: map[ui.ColumnRole]siftly.RoleLayout{
 			RolePrimary: {
 				MinWidth: 50,
@@ -92,4 +95,19 @@ func todaylogColumnSchema() siftly.ColumnSchema {
 			},
 		},
 	}
+}
+
+func parseTodaylogUnixSeconds(cols []string, timeColumnIndex int) (time.Time, bool) {
+	if timeColumnIndex < 0 || timeColumnIndex >= len(cols) {
+		return time.Time{}, false
+	}
+	raw := strings.TrimSpace(cols[timeColumnIndex])
+	if raw == "" {
+		return time.Time{}, false
+	}
+	secs, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return time.Unix(secs, 0), true
 }

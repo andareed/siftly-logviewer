@@ -2,7 +2,9 @@ package todaylog
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -14,6 +16,13 @@ import (
 )
 
 var todaylogHeader = []string{"date", "timestamp", "pid", "process", "key", "value"}
+
+const (
+	todaylogEstimateSampleBytes = 8 << 20
+	todaylogEstimateSampleRows  = 100000
+	todaylogReserveFillRatio    = 0.90
+	todaylogScannerBufferMax    = 16 * 1024 * 1024
+)
 
 func LoadModelAuto(path string) (*siftly.Model, error) {
 	ext := strings.ToLower(filepath.Ext(path))
@@ -36,9 +45,22 @@ func initiateModelFromStats(statsFile string) (*siftly.Model, error) {
 	if err != nil {
 		return nil, err
 	}
+	if estimate, sampleBytes, sampleRows, err := estimateTodaylogRowCapacity(file); err != nil {
+		return nil, err
+	} else if estimate > 0 {
+		builder.ReserveRows(estimate)
+		if profile := logging.IsDebugMode(); profile {
+			logging.Infof(
+				"todaylog prealloc estimate: rows=%d sampleBytes=%d sampleRows=%d",
+				estimate,
+				sampleBytes,
+				sampleRows,
+			)
+		}
+	}
 
 	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	scanner.Buffer(make([]byte, 0, 64*1024), todaylogScannerBufferMax)
 
 	profile := logging.IsDebugMode()
 	var parseDuration time.Duration
@@ -199,4 +221,50 @@ func isDecimal(s string) bool {
 		}
 	}
 	return true
+}
+
+func estimateTodaylogRowCapacity(file *os.File) (estimate int, sampleBytes int64, sampleRows int, err error) {
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
+		return 0, 0, 0, fmt.Errorf("seek %q: %w", file.Name(), err)
+	}
+
+	info, err := file.Stat()
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("stat %q: %w", file.Name(), err)
+	}
+	if info.Size() <= 0 {
+		return 0, 0, 0, nil
+	}
+
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 0, 64*1024), todaylogScannerBufferMax)
+	for scanner.Scan() {
+		raw := scanner.Bytes()
+		sampleBytes += int64(len(raw) + 1)
+		if len(bytes.TrimSpace(raw)) == 0 {
+			if sampleBytes >= todaylogEstimateSampleBytes {
+				break
+			}
+			continue
+		}
+		sampleRows++
+		if sampleBytes >= todaylogEstimateSampleBytes || sampleRows >= todaylogEstimateSampleRows {
+			break
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, 0, 0, fmt.Errorf("sample %q: %w", file.Name(), err)
+	}
+	if _, err = file.Seek(0, io.SeekStart); err != nil {
+		return 0, 0, 0, fmt.Errorf("seek reset %q: %w", file.Name(), err)
+	}
+	if sampleBytes == 0 || sampleRows == 0 {
+		return 0, sampleBytes, sampleRows, nil
+	}
+
+	est := int((float64(info.Size()) / float64(sampleBytes)) * float64(sampleRows) * todaylogReserveFillRatio)
+	if est < 1024 {
+		est = 1024
+	}
+	return est, sampleBytes, sampleRows, nil
 }

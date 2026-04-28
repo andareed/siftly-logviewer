@@ -23,6 +23,7 @@ type ColumnSchema struct {
 	RoleForName     func(name string) ui.ColumnRole
 	RoleDefaults    map[ui.ColumnRole]RoleLayout
 	ColumnDefaults  map[string]RoleLayout
+	TimeParser      func(cols []string, timeColumnIndex int) (time.Time, bool)
 }
 
 type RoleLayout struct {
@@ -35,11 +36,22 @@ type modelBuilder struct {
 	hasData         []bool
 	rows            []Row
 	timeColumnIndex int
+	timeParser      func(cols []string, timeColumnIndex int) (time.Time, bool)
 	rowTimes        []time.Time
 	rowHasTimes     []bool
 	hasTimeBounds   bool
 	timeMin         time.Time
 	timeMax         time.Time
+	profile         bool
+	rowsCapGrowths  int
+	rowsGrowTime    time.Duration
+	rowsCopyElems   int
+	timesCapGrowths int
+	timesGrowTime   time.Duration
+	timesCopyElems  int
+	flagsCapGrowths int
+	flagsGrowTime   time.Duration
+	flagsCopyElems  int
 }
 
 type ModelBuilder struct {
@@ -130,6 +142,13 @@ func (b *ModelBuilder) Build() *Model {
 	return b.builder.finish()
 }
 
+func (b *ModelBuilder) ReserveRows(capacity int) {
+	if b == nil || b.builder == nil {
+		return
+	}
+	b.builder.reserveRows(capacity)
+}
+
 func newModelBuilder(rawHeader []string, schema ColumnSchema) (*modelBuilder, error) {
 	if len(rawHeader) == 0 {
 		return nil, fmt.Errorf("header row is empty")
@@ -146,8 +165,10 @@ func newModelBuilder(rawHeader []string, schema ColumnSchema) (*modelBuilder, er
 		hasData:         make([]bool, len(cols)),
 		rows:            make([]Row, 0, 1024),
 		timeColumnIndex: featuretimewindow.FindTimeColumnIndex(headerNames),
+		timeParser:      schema.TimeParser,
 		rowTimes:        make([]time.Time, 0, 1024),
 		rowHasTimes:     make([]bool, 0, 1024),
+		profile:         logging.IsDebugMode(),
 	}, nil
 }
 
@@ -210,7 +231,7 @@ func (b *modelBuilder) addRow(source []string, originalIndex int, copyCols bool)
 		rowCols = append([]string(nil), source...)
 	}
 	for colIdx := range b.header {
-		if colIdx < len(rowCols) && strings.TrimSpace(rowCols[colIdx]) != "" {
+		if colIdx < len(rowCols) && rowCols[colIdx] != "" {
 			b.hasData[colIdx] = true
 		}
 	}
@@ -220,11 +241,12 @@ func (b *modelBuilder) addRow(source []string, originalIndex int, copyCols bool)
 		OriginalIndex: originalIndex,
 	}
 	row.ID = row.ComputeID()
-	b.rows = append(b.rows, row)
+
+	b.appendRow(row)
 
 	ts, ok := b.parseRowTime(rowCols)
-	b.rowTimes = append(b.rowTimes, ts)
-	b.rowHasTimes = append(b.rowHasTimes, ok)
+	b.appendTimeMeta(ts, ok)
+
 	if ok {
 		if !b.hasTimeBounds {
 			b.timeMin = ts
@@ -245,10 +267,31 @@ func (b *modelBuilder) parseRowTime(cols []string) (time.Time, bool) {
 	if b.timeColumnIndex < 0 || b.timeColumnIndex >= len(cols) {
 		return time.Time{}, false
 	}
+	if b.timeParser != nil {
+		return b.timeParser(cols, b.timeColumnIndex)
+	}
 	return featuretimewindow.ParseLogTimestamp(cols[b.timeColumnIndex])
 }
 
 func (b *modelBuilder) finish() *Model {
+	if b.profile {
+		logging.Infof(
+			"model builder storage: rows=%d rowsCap=%d grows=%d growTime=%s copyElems=%d rowTimesCap=%d grows=%d growTime=%s copyElems=%d rowHasTimesCap=%d grows=%d growTime=%s copyElems=%d",
+			len(b.rows),
+			cap(b.rows),
+			b.rowsCapGrowths,
+			b.rowsGrowTime.Round(time.Millisecond),
+			b.rowsCopyElems,
+			cap(b.rowTimes),
+			b.timesCapGrowths,
+			b.timesGrowTime.Round(time.Millisecond),
+			b.timesCopyElems,
+			cap(b.rowHasTimes),
+			b.flagsCapGrowths,
+			b.flagsGrowTime.Round(time.Millisecond),
+			b.flagsCopyElems,
+		)
+	}
 	for i := range b.header {
 		if b.hasData[i] {
 			continue
@@ -278,6 +321,71 @@ func (b *modelBuilder) finish() *Model {
 			derivedTimeData: true,
 		},
 		view: viewState{mode: modeView},
+	}
+}
+
+func (b *modelBuilder) reserveRows(capacity int) {
+	if capacity <= 0 {
+		return
+	}
+	if cap(b.rows) < capacity {
+		rows := make([]Row, len(b.rows), capacity)
+		copy(rows, b.rows)
+		b.rows = rows
+	}
+	if cap(b.rowTimes) < capacity {
+		rowTimes := make([]time.Time, len(b.rowTimes), capacity)
+		copy(rowTimes, b.rowTimes)
+		b.rowTimes = rowTimes
+	}
+	if cap(b.rowHasTimes) < capacity {
+		rowHasTimes := make([]bool, len(b.rowHasTimes), capacity)
+		copy(rowHasTimes, b.rowHasTimes)
+		b.rowHasTimes = rowHasTimes
+	}
+}
+
+func (b *modelBuilder) appendRow(row Row) {
+	if !b.profile || len(b.rows) < cap(b.rows) {
+		b.rows = append(b.rows, row)
+		return
+	}
+
+	prevLen := len(b.rows)
+	start := time.Now()
+	b.rows = append(b.rows, row)
+	b.rowsGrowTime += time.Since(start)
+	b.rowsCapGrowths++
+	b.rowsCopyElems += prevLen
+}
+
+func (b *modelBuilder) appendTimeMeta(ts time.Time, ok bool) {
+	if !b.profile || (len(b.rowTimes) < cap(b.rowTimes) && len(b.rowHasTimes) < cap(b.rowHasTimes)) {
+		b.rowTimes = append(b.rowTimes, ts)
+		b.rowHasTimes = append(b.rowHasTimes, ok)
+		return
+	}
+
+	if len(b.rowTimes) == cap(b.rowTimes) {
+		prevLen := len(b.rowTimes)
+		start := time.Now()
+		b.rowTimes = append(b.rowTimes, ts)
+		b.timesGrowTime += time.Since(start)
+		b.timesCapGrowths++
+		b.timesCopyElems += prevLen
+	} else {
+		b.rowTimes = append(b.rowTimes, ts)
+	}
+
+	if len(b.rowHasTimes) == cap(b.rowHasTimes) {
+		prevLen := len(b.rowHasTimes)
+		start := time.Now()
+		b.rowHasTimes = append(b.rowHasTimes, ok)
+		b.flagsGrowTime += time.Since(start)
+		b.flagsCapGrowths++
+		b.flagsCopyElems += prevLen
+	} else {
+		b.rowHasTimes = append(b.rowHasTimes, ok)
 	}
 }
 
