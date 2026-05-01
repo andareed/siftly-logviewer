@@ -33,8 +33,8 @@ func TestEnterCommandCommentSeedsExistingComment(t *testing.T) {
 	if m.view.command.cmd != CmdComment {
 		t.Fatalf("command not set to comment: got %v", m.view.command.cmd)
 	}
-	if m.view.command.buf != "existing note" {
-		t.Fatalf("comment seed mismatch: got %q want %q", m.view.command.buf, "existing note")
+	if got := m.commandValue(); got != "existing note" {
+		t.Fatalf("comment seed mismatch: got %q want %q", got, "existing note")
 	}
 }
 
@@ -70,7 +70,7 @@ func TestEnterFooterTextCommandCapturesMainBodySnapshot(t *testing.T) {
 	}
 
 	snapshot := m.view.mainBodySnapshot
-	m.view.command.buf = "abc"
+	m.setCommandValue("abc")
 	if got := m.mainBodyForView(m.panelWidth()); got != snapshot {
 		t.Fatalf("main body should reuse snapshot while footer text changes")
 	}
@@ -128,6 +128,19 @@ func TestSnapshotAppFrameMatchesLiveAppFrame(t *testing.T) {
 	}
 }
 
+func TestHandleCommandKeyAppendsBatchedRunes(t *testing.T) {
+	m := &Model{}
+	_ = m.enterCommand(CmdFilter, "", false, false)
+
+	_, cmd := m.handleCommandKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("va.msg")})
+	if cmd != nil {
+		t.Fatalf("batched runes should not return command")
+	}
+	if got := m.commandValue(); got != "va.msg" {
+		t.Fatalf("command buffer = %q, want %q", got, "va.msg")
+	}
+}
+
 func TestFilterCommandCtrlHOpensHistoryPalette(t *testing.T) {
 	dir := t.TempDir()
 	historyPath := filepath.Join(dir, "history.json")
@@ -138,11 +151,8 @@ func TestFilterCommandCtrlHOpensHistoryPalette(t *testing.T) {
 	m := &Model{
 		terminalWidth:  100,
 		terminalHeight: 30,
-		view: viewState{
-			mode:    modeCommand,
-			command: CommandInput{cmd: CmdFilter},
-		},
 	}
+	_ = m.enterCommand(CmdFilter, "", false, false)
 	m.SetFilterConfig(FilterConfigSettings{
 		DefaultPresets: PresetList{{Pattern: "preset-pattern", Description: "preset"}},
 		HistoryPath:    historyPath,

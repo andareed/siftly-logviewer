@@ -27,15 +27,16 @@ func (m *Model) handleDialogInput(msg tea.Msg) (tea.Cmd, bool) {
 	if m.activeDialog == nil || !m.activeDialog.IsVisible() {
 		return nil, false
 	}
-	km, ok := msg.(tea.KeyMsg)
-	if !ok {
+	if _, ok := msg.(tea.WindowSizeMsg); ok {
 		return nil, false
 	}
-	logging.Debugf("DIALOG UPDATE: %T got key %q", m.activeDialog, km.String())
+	if km, ok := msg.(tea.KeyMsg); ok {
+		logging.Debugf("DIALOG UPDATE: %T got key %q", m.activeDialog, km.String())
+	}
 	logging.Debugf("model:Update:: Dialog box is active forward update to it")
 	var dialogCmd tea.Cmd
 	var action dialogs.Action
-	m.activeDialog, action, dialogCmd = m.activeDialog.Update(km)
+	m.activeDialog, action, dialogCmd = m.activeDialog.Update(msg)
 	actionCmd := m.applyDialogAction(action)
 	return batchCmd(dialogCmd, actionCmd), true
 }
@@ -109,9 +110,8 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 		return nil
 	case dialogs.ActionFilterApply:
 		m.hideActiveDialog()
-		m.view.command.cmd = CmdFilter
+		m.view.command = newCommandInput(CmdFilter, action.Pattern)
 		m.view.mode = modeCommand
-		m.view.command.buf = action.Pattern
 		m.captureMainBodySnapshot(m.panelWidth())
 		return nil
 	case dialogs.ActionFilterCancel:

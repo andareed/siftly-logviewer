@@ -25,7 +25,7 @@ func (m *Model) runCommand() tea.Cmd {
 	if !ok {
 		return nil
 	}
-	return runner(m, m.view.command.buf)
+	return runner(m, m.commandValue())
 }
 
 func runJumpCommand(m *Model, raw string) tea.Cmd {
@@ -104,6 +104,20 @@ func runCommentCommand(m *Model, raw string) tea.Cmd {
 	return m.view.notice.Start("Comment added", "", noticeDuration)
 }
 
+func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if m.view.mode != modeCommand {
+		return m, nil, false
+	}
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		next, cmd := m.handleCommandKey(keyMsg)
+		return next, cmd, true
+	}
+	if m.view.command.cmd == CmdMark || m.view.command.cmd == CmdTimeWindowSet {
+		return m, nil, false
+	}
+	return m, m.updateCommandInput(msg), true
+}
+
 func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.view.command.cmd == CmdFilter {
 		switch msg.String() {
@@ -135,20 +149,21 @@ func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmd, exitCmd)
 	}
 
-	// editing
-	switch msg.Type {
-	case tea.KeyBackspace:
-		if len(m.view.command.buf) > 0 {
-			m.view.command.buf = m.view.command.buf[:len(m.view.command.buf)-1]
-		}
-		return m, nil
-	}
+	return m, m.updateCommandInput(msg)
+}
 
-	// append printable rune
-	if len(msg.Runes) == 1 {
-		m.view.command.buf += string(msg.Runes[0])
+func (m *Model) updateCommandInput(msg tea.Msg) tea.Cmd {
+	m.ensureCommandInput()
+	var cmd tea.Cmd
+	m.view.command.input, cmd = m.view.command.input.Update(msg)
+
+	// The footer renders textinput.Value(), not textinput.View(), so cursor
+	// blink commands only create needless internal messages. Preserve ctrl+v
+	// because textinput uses a command to fetch clipboard contents.
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "ctrl+v" {
+		return cmd
 	}
-	return m, nil
+	return nil
 }
 
 func (m *Model) openFilterPalette(history bool) tea.Cmd {

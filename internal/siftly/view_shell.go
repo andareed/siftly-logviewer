@@ -61,7 +61,7 @@ func (m *Model) footerView(width int) string {
 	case modeCommand:
 		isInputMode = true
 		footerMode = m.view.command.cmd
-		modeInput = m.view.command.buf
+		modeInput = m.commandValue()
 	case modeTimeWindow:
 		footerMode = CmdTimeWindowSet
 		isInputMode = true

@@ -100,6 +100,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.handleWindowMsg(msg); handled {
 		return m, cmd
 	}
+	if next, cmd, handled := m.handleCommandMsg(msg); handled {
+		return next, cmd
+	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
 		return m.handleKeyMsg(keyMsg)
 	}

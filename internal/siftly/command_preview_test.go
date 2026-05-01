@@ -15,24 +15,19 @@ func TestCommandPreviewSuffix(t *testing.T) {
 			},
 			filteredIndices: []int{0, 1, 2},
 		},
-		view: viewState{
-			command: CommandInput{},
-		},
 	}
 
-	m.view.command.cmd = CmdSort
-	m.view.command.buf = "missing-column"
+	m.view.command = newCommandInput(CmdSort, "missing-column")
 	if got := m.commandPreviewSuffix(); got != " (invalid sort)" {
 		t.Fatalf("commandPreviewSuffix sort invalid=%q want=%q", got, " (invalid sort)")
 	}
 
-	m.view.command.buf = "1 desc"
+	m.setCommandValue("1 desc")
 	if got := m.commandPreviewSuffix(); got != " (3 matches)" {
 		t.Fatalf("commandPreviewSuffix sort valid=%q want=%q", got, " (3 matches)")
 	}
 
-	m.view.command.cmd = CmdFilter
-	m.view.command.buf = "msg.add"
+	m.view.command = newCommandInput(CmdFilter, "msg.add")
 	if got := m.commandPreviewSuffix(); got != "" {
 		t.Fatalf("commandPreviewSuffix filter=%q want empty", got)
 	}
