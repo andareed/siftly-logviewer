@@ -105,28 +105,13 @@ func runCommentCommand(m *Model, raw string) tea.Cmd {
 }
 
 func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.view.command.cmd == CmdFilter && msg.String() == "ctrl+p" {
-		cfg, err := m.loadFilterConfig()
-		if err != nil {
-			return m, m.view.notice.Start("Filter presets error", "warn", noticeDuration)
+	if m.view.command.cmd == CmdFilter {
+		switch msg.String() {
+		case "ctrl+p":
+			return m, m.openFilterPalette(false)
+		case "ctrl+h":
+			return m, m.openFilterPalette(true)
 		}
-		presets := make([]dialogs.FilterPreset, 0, len(cfg.Presets))
-		for _, preset := range cfg.Presets {
-			presets = append(presets, dialogs.FilterPreset{
-				Pattern:     preset.Pattern,
-				Description: preset.Description,
-			})
-		}
-		m.activeDialog = dialogs.NewFilterPaletteDialog(
-			presets,
-			cfg.History,
-			m.terminalWidth,
-			m.terminalHeight,
-			m.styles.RowSelectedFG,
-			m.styles.RowSelectedBG,
-		)
-		m.activeDialog.Show()
-		return m, nil
 	}
 
 	// universal cancel
@@ -164,4 +149,40 @@ func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.view.command.buf += string(msg.Runes[0])
 	}
 	return m, nil
+}
+
+func (m *Model) openFilterPalette(history bool) tea.Cmd {
+	cfg, err := m.loadFilterConfig()
+	if err != nil {
+		return m.view.notice.Start("Filter palette error", "warn", noticeDuration)
+	}
+	presets := make([]dialogs.FilterPreset, 0, len(cfg.Presets))
+	for _, preset := range cfg.Presets {
+		presets = append(presets, dialogs.FilterPreset{
+			Pattern:     preset.Pattern,
+			Description: preset.Description,
+		})
+	}
+
+	if history {
+		m.activeDialog = dialogs.NewFilterHistoryPaletteDialog(
+			presets,
+			cfg.History,
+			m.terminalWidth,
+			m.terminalHeight,
+			m.styles.RowSelectedFG,
+			m.styles.RowSelectedBG,
+		)
+	} else {
+		m.activeDialog = dialogs.NewFilterPaletteDialog(
+			presets,
+			cfg.History,
+			m.terminalWidth,
+			m.terminalHeight,
+			m.styles.RowSelectedFG,
+			m.styles.RowSelectedBG,
+		)
+	}
+	m.activeDialog.Show()
+	return nil
 }

@@ -55,6 +55,14 @@ type FilterPreset struct {
 }
 
 func NewFilterPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color) *FilterPalette {
+	return newFilterPaletteDialog(presets, history, width, height, selectedFG, selectedBG, lastFilterPaletteTab)
+}
+
+func NewFilterHistoryPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color) *FilterPalette {
+	return newFilterPaletteDialog(presets, history, width, height, selectedFG, selectedBG, filterTabHistory)
+}
+
+func newFilterPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color, initialTab filterPaletteTab) *FilterPalette {
 	w := width - 4
 	h := height - 4
 	if w < 64 {
@@ -75,7 +83,7 @@ func NewFilterPaletteDialog(presets []FilterPreset, history []string, width, hei
 		input:         ti,
 		presets:       presets,
 		history:       history,
-		activeTab:     lastFilterPaletteTab,
+		activeTab:     initialTab,
 		focusArea:     filterFocusInput,
 		presetCursor:  -1,
 		historyCursor: -1,

@@ -1,10 +1,14 @@
 package siftly
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/features/dialogs"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	"github.com/charmbracelet/bubbles/viewport"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -121,5 +125,42 @@ func TestSnapshotAppFrameMatchesLiveAppFrame(t *testing.T) {
 
 	if snapshotFrame != liveFrame {
 		t.Fatalf("snapshot frame should match live frame")
+	}
+}
+
+func TestFilterCommandCtrlHOpensHistoryPalette(t *testing.T) {
+	dir := t.TempDir()
+	historyPath := filepath.Join(dir, "history.json")
+	if err := os.WriteFile(historyPath, []byte(`{"history":["history-pattern","older-pattern"]}`), 0o644); err != nil {
+		t.Fatalf("write history: %v", err)
+	}
+
+	m := &Model{
+		terminalWidth:  100,
+		terminalHeight: 30,
+		view: viewState{
+			mode:    modeCommand,
+			command: CommandInput{cmd: CmdFilter},
+		},
+	}
+	m.SetFilterConfig(FilterConfigSettings{
+		DefaultPresets: PresetList{{Pattern: "preset-pattern", Description: "preset"}},
+		HistoryPath:    historyPath,
+	})
+
+	_, cmd := m.handleCommandKey(tea.KeyMsg{Type: tea.KeyCtrlH})
+	if cmd != nil {
+		t.Fatalf("ctrl+h should open history palette without returning a command")
+	}
+	if m.activeDialog == nil || !m.activeDialog.IsVisible() {
+		t.Fatalf("ctrl+h should open the filter palette")
+	}
+
+	_, action, _ := m.activeDialog.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	if action.Kind != dialogs.ActionFilterApply {
+		t.Fatalf("enter action = %v, want ActionFilterApply", action.Kind)
+	}
+	if action.Pattern != "history-pattern" {
+		t.Fatalf("selected pattern = %q, want %q", action.Pattern, "history-pattern")
 	}
 }

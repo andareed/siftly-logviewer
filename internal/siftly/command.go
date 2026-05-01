@@ -54,7 +54,7 @@ var commandMetaTable = map[Command]commandMeta{
 		Label:  "FILTER",
 		Badge:  "[f]",
 		Prompt: "filter: ",
-		Hints:  "enter: apply   ctrl+p: palette   esc: cancel",
+		Hints:  "enter: apply   ctrl+p: presets   ctrl+h: history   esc: cancel",
 	},
 	CmdSort: {
 		Label:  "SORT",
