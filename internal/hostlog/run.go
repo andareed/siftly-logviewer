@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
+	"github.com/andareed/siftly-hostlog/internal/shared/tui"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -22,7 +23,7 @@ func Run(inputPath, debugLogPath, filterPresetsPath, filterHistoryPath string) e
 	}
 	configureFilterConfig(m, filterPresetsPath, filterHistoryPath)
 
-	if _, err = tea.NewProgram(m, tea.WithAltScreen()).Run(); err != nil {
+	if _, err = tea.NewProgram(m, tui.ProgramOptions()...).Run(); err != nil {
 		return fmt.Errorf("tea program: %w", err)
 	}
 

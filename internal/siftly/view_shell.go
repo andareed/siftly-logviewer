@@ -126,6 +126,17 @@ func (m *Model) View() string {
 	}
 
 	panelW := m.panelWidth()
+	if m.view.mainBodySnapshotActive {
+		if !m.mainBodySnapshotValid(panelW) {
+			m.captureMainBodySnapshot(panelW)
+		}
+		base := m.snapshotAppFrameView(panelW)
+		if m.view.mode != modeTimeWindow || !m.view.timeWindow.Open {
+			return base
+		}
+		return m.renderTimeWindowDialog(base)
+	}
+
 	body := m.mainBodyForView(panelW)
 	base := m.appFrameView(body, panelW)
 	if m.view.mode != modeTimeWindow || !m.view.timeWindow.Open {
@@ -146,6 +157,7 @@ func (m *Model) mainBodyForView(panelW int) string {
 
 func (m *Model) mainBodySnapshotValid(panelW int) bool {
 	return m.view.mainBodySnapshot != "" &&
+		m.view.mainBodyFrameSnapshot != "" &&
 		m.view.mainBodySnapshotWidth == panelW &&
 		m.view.mainBodySnapshotHeight == m.terminalHeight
 }

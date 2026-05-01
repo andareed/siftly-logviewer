@@ -7,9 +7,27 @@ import (
 )
 
 const (
-	logTimeLayout  = "Mon Jan 02 15:04:05 MST 2006"
-	dateTimeLayout = "2006-01-02 15:04:05"
+	logTimeLayout     = "Mon Jan 02 15:04:05 2006"
+	dateTimeLayout    = "2006-01-02 15:04:05"
+	secondsPerHour    = 60 * 60
+	secondsPerMinute  = 60
+	unknownZoneOffset = 0
 )
+
+var knownZoneOffsets = map[string]int{
+	"GMT":  0,
+	"UTC":  0,
+	"BST":  1 * secondsPerHour,
+	"CET":  1 * secondsPerHour,
+	"CEST": 2 * secondsPerHour,
+	"WET":  0,
+	"WEST": 1 * secondsPerHour,
+	"EET":  2 * secondsPerHour,
+	"EEST": 3 * secondsPerHour,
+	"CAT":  2 * secondsPerHour,
+	"SAST": 2 * secondsPerHour,
+	"EAT":  3 * secondsPerHour,
+}
 
 type Bounds struct {
 	Has             bool
@@ -101,7 +119,7 @@ func ParseLogTimestamp(raw string) (time.Time, bool) {
 		return ts, true
 	}
 
-	if ts, err := time.Parse(logTimeLayout, raw); err == nil {
+	if ts, ok := parseHostlogTimestamp(raw); ok {
 		return ts, true
 	}
 	if ts, err := time.Parse(dateTimeLayout, raw); err == nil {
@@ -110,17 +128,155 @@ func ParseLogTimestamp(raw string) (time.Time, bool) {
 	if ts, err := time.Parse(time.RFC3339Nano, raw); err == nil {
 		return ts, true
 	}
-
-	if idx := strings.LastIndex(raw, ":"); idx != -1 {
-		raw = strings.TrimSpace(raw[:idx])
-	}
-	if ts, err := time.Parse(logTimeLayout, raw); err == nil {
-		return ts, true
-	}
-	if ts, err := time.Parse(dateTimeLayout, raw); err == nil {
-		return ts, true
-	}
 	return time.Time{}, false
+}
+
+func parseHostlogTimestamp(raw string) (time.Time, bool) {
+	fields := strings.Fields(raw)
+	if len(fields) != 6 {
+		return time.Time{}, false
+	}
+
+	year := fields[5]
+	if idx := strings.Index(year, ":"); idx != -1 {
+		if !isSignedDecimal(year[idx+1:]) {
+			return time.Time{}, false
+		}
+		year = year[:idx]
+	}
+
+	zoneName, zoneOffset, ok := parseZoneToken(fields[4])
+	if !ok {
+		return time.Time{}, false
+	}
+
+	rawNoZone := strings.Join([]string{
+		fields[0],
+		fields[1],
+		fields[2],
+		fields[3],
+		year,
+	}, " ")
+	ts, err := time.ParseInLocation(logTimeLayout, rawNoZone, time.FixedZone(zoneName, zoneOffset))
+	if err != nil {
+		return time.Time{}, false
+	}
+	return ts, true
+}
+
+func parseZoneToken(raw string) (string, int, bool) {
+	zone := strings.ToUpper(strings.TrimSpace(raw))
+	if zone == "" {
+		return "", 0, false
+	}
+
+	for _, prefix := range []string{"GMT", "UTC"} {
+		if zone == prefix {
+			return prefix, 0, true
+		}
+		if strings.HasPrefix(zone, prefix) {
+			offset, ok := parseNumericOffset(zone[len(prefix):])
+			if ok {
+				return zone, offset, true
+			}
+		}
+	}
+
+	if offset, ok := parseNumericOffset(zone); ok {
+		return zone, offset, true
+	}
+	if offset, ok := knownZoneOffsets[zone]; ok {
+		return zone, offset, true
+	}
+	if isZoneAbbreviation(zone) {
+		// Unknown abbreviations are accepted so rows stay usable; exact conversion needs a configured offset.
+		return zone, unknownZoneOffset, true
+	}
+	return "", 0, false
+}
+
+func parseNumericOffset(raw string) (int, bool) {
+	if len(raw) < 2 {
+		return 0, false
+	}
+
+	sign := 1
+	switch raw[0] {
+	case '+':
+	case '-':
+		sign = -1
+	default:
+		return 0, false
+	}
+
+	body := raw[1:]
+	var hourStr string
+	var minuteStr string
+	if strings.Contains(body, ":") {
+		parts := strings.Split(body, ":")
+		if len(parts) != 2 {
+			return 0, false
+		}
+		hourStr = parts[0]
+		minuteStr = parts[1]
+	} else {
+		switch len(body) {
+		case 1, 2:
+			hourStr = body
+			minuteStr = "0"
+		case 3:
+			hourStr = body[:1]
+			minuteStr = body[1:]
+		case 4:
+			hourStr = body[:2]
+			minuteStr = body[2:]
+		default:
+			return 0, false
+		}
+	}
+
+	hours, err := strconv.Atoi(hourStr)
+	if err != nil {
+		return 0, false
+	}
+	minutes, err := strconv.Atoi(minuteStr)
+	if err != nil {
+		return 0, false
+	}
+	if hours > 23 || minutes > 59 {
+		return 0, false
+	}
+	return sign * ((hours * secondsPerHour) + (minutes * secondsPerMinute)), true
+}
+
+func isZoneAbbreviation(zone string) bool {
+	if len(zone) < 2 || len(zone) > 8 {
+		return false
+	}
+	for _, r := range zone {
+		if r < 'A' || r > 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+func isSignedDecimal(raw string) bool {
+	if raw == "" {
+		return false
+	}
+	if raw[0] == '+' || raw[0] == '-' {
+		raw = raw[1:]
+	}
+	if raw == "" {
+		return false
+	}
+	for _, r := range raw {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func parseUnixTimestamp(raw string) (time.Time, bool) {

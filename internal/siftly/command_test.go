@@ -3,7 +3,9 @@ package siftly
 import (
 	"testing"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func TestEnterCommandCommentSeedsExistingComment(t *testing.T) {
@@ -53,6 +55,9 @@ func TestEnterFooterTextCommandCapturesMainBodySnapshot(t *testing.T) {
 	if m.view.mainBodySnapshot == "" {
 		t.Fatalf("main body snapshot should be captured")
 	}
+	if m.view.mainBodyFrameSnapshot == "" {
+		t.Fatalf("main body frame snapshot should be captured")
+	}
 	if m.view.mainBodySnapshotWidth != m.panelWidth() {
 		t.Fatalf("snapshot width = %d want %d", m.view.mainBodySnapshotWidth, m.panelWidth())
 	}
@@ -86,5 +91,35 @@ func TestExitCommandClearsMainBodySnapshot(t *testing.T) {
 	}
 	if m.view.mainBodySnapshot != "" {
 		t.Fatalf("main body snapshot should be cleared")
+	}
+	if m.view.mainBodyFrameSnapshot != "" {
+		t.Fatalf("main body frame snapshot should be cleared")
+	}
+}
+
+func TestSnapshotAppFrameMatchesLiveAppFrame(t *testing.T) {
+	m := &Model{
+		ready:          true,
+		terminalHeight: 24,
+		viewport:       viewport.New(20, 5),
+		styles:         ui.Styles{App: lipgloss.NewStyle().Margin(1, 2)},
+		cursor:         0,
+		table: tableState{
+			rows:            []Row{{ID: 42, Cols: []string{"alpha"}, OriginalIndex: 1}},
+			filteredIndices: []int{0},
+		},
+	}
+	m.viewport.SetContent("alpha")
+
+	_ = m.enterCommand(CmdFilter, "", false, false)
+	snapshotFrame := m.View()
+
+	m.view.mainBodySnapshotActive = false
+	m.view.mainBodySnapshot = ""
+	m.view.mainBodyFrameSnapshot = ""
+	liveFrame := m.View()
+
+	if snapshotFrame != liveFrame {
+		t.Fatalf("snapshot frame should match live frame")
 	}
 }

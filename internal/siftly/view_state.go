@@ -29,6 +29,7 @@ type viewState struct {
 	command                 CommandInput
 	mainBodySnapshotActive  bool
 	mainBodySnapshot        string
+	mainBodyFrameSnapshot   string
 	mainBodySnapshotWidth   int
 	mainBodySnapshotHeight  int
 	modeHintSeq             int

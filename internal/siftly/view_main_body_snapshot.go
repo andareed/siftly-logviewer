@@ -15,10 +15,19 @@ func (m *Model) captureMainBodySnapshot(panelW int) {
 		return
 	}
 	m.view.mainBodySnapshot = m.mainBodyView(panelW)
+	m.view.mainBodyFrameSnapshot = m.styles.App.MarginBottom(0).Render(m.view.mainBodySnapshot)
 	m.view.mainBodySnapshotWidth = panelW
 	m.view.mainBodySnapshotHeight = m.terminalHeight
 	m.view.mainBodySnapshotActive = true
 	logging.Infof("main body snapshot captured width=%d height=%d mode=%d cmd=%d", panelW, m.terminalHeight, m.view.mode, m.view.command.cmd)
+}
+
+func (m *Model) snapshotAppFrameView(panelW int) string {
+	footer := m.styles.App.MarginTop(0).Render(m.footerView(panelW))
+	if m.view.mainBodyFrameSnapshot == "" {
+		return footer
+	}
+	return m.view.mainBodyFrameSnapshot + "\n" + footer
 }
 
 func (m *Model) clearMainBodySnapshot() {
@@ -27,6 +36,7 @@ func (m *Model) clearMainBodySnapshot() {
 	}
 	m.view.mainBodySnapshotActive = false
 	m.view.mainBodySnapshot = ""
+	m.view.mainBodyFrameSnapshot = ""
 	m.view.mainBodySnapshotWidth = 0
 	m.view.mainBodySnapshotHeight = 0
 }

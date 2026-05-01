@@ -11,7 +11,7 @@ usage() {
   cat <<'USAGE'
 Usage: scripts/install-remote.sh [--dry-run] [DEST_ROOT]
 
-Installs versioned Linux binaries from dist/ into the remote tool layout:
+Copies versioned Linux binaries from dist/ into the remote tool layout:
   hostlog  -> DEST_ROOT/hostlog/scripts/hostlog
   todaylog -> DEST_ROOT/todaylog/scripts/todaylog
   devfmt   -> DEST_ROOT/devinfo/scripts/devinfo
@@ -105,9 +105,13 @@ install_tool() {
     echo "destination scripts directory not found: $dst_dir" >&2
     return 1
   fi
+  if [ ! -f "$dst" ]; then
+    echo "destination binary not found, refusing to create with new permissions: $dst" >&2
+    return 1
+  fi
 
-  echo "Installing $(basename "$src") -> $dst"
-  run install -m 700 "$src" "$dst"
+  echo "Copying $(basename "$src") -> $dst"
+  run cp "$src" "$dst"
 }
 
 install_tool hostlog hostlog hostlog
