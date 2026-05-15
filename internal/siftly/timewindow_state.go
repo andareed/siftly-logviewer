@@ -44,18 +44,45 @@ func (m *Model) computeTimeBounds() {
 	for i := range m.table.header {
 		header[i] = m.table.header[i].Name
 	}
-	rows := make([][]string, len(m.table.rows))
-	for i := range m.table.rows {
-		rows[i] = m.table.rows[i].Cols
-	}
-	bounds := featuretimewindow.ComputeBounds(header, rows)
+	timeCol := featuretimewindow.FindTimeColumnIndex(header)
+	rowTimes := make([]time.Time, len(m.table.rows))
+	rowHasTimes := make([]bool, len(m.table.rows))
 
-	m.table.timeColumnIndex = bounds.TimeColumnIndex
-	m.table.rowTimes = bounds.RowTimes
-	m.table.rowHasTimes = bounds.RowHasTimes
-	m.table.hasTimeBounds = bounds.Has
-	m.table.timeMin = bounds.Min
-	m.table.timeMax = bounds.Max
+	hasAny := false
+	var minTime time.Time
+	var maxTime time.Time
+	if timeCol >= 0 {
+		for i, row := range m.table.rows {
+			if timeCol >= len(row.Cols) {
+				continue
+			}
+			ts, ok := featuretimewindow.ParseLogTimestamp(row.Cols[timeCol])
+			if !ok {
+				continue
+			}
+			rowTimes[i] = ts
+			rowHasTimes[i] = true
+			if !hasAny {
+				minTime = ts
+				maxTime = ts
+				hasAny = true
+				continue
+			}
+			if ts.Before(minTime) {
+				minTime = ts
+			}
+			if ts.After(maxTime) {
+				maxTime = ts
+			}
+		}
+	}
+
+	m.table.timeColumnIndex = timeCol
+	m.table.rowTimes = rowTimes
+	m.table.rowHasTimes = rowHasTimes
+	m.table.hasTimeBounds = hasAny
+	m.table.timeMin = minTime
+	m.table.timeMax = maxTime
 	m.table.derivedTimeData = true
 }
 

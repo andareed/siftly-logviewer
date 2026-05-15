@@ -1,9 +1,11 @@
 package siftly
 
 import (
+	"bufio"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -14,7 +16,12 @@ import (
 
 // --- Wire format ---
 
-const snapshotVersion = 1
+const (
+	legacySnapshotVersion = 1
+	snapshotVersion       = 2
+	metaVersion           = 1
+	rowIDAlgorithm        = "fnv1a-normalized-v1"
+)
 
 type rowDTO struct {
 	Cols          []string `json:"cols"`
@@ -23,20 +30,17 @@ type rowDTO struct {
 	OriginalIndex int      `json:"originalIndex"`
 }
 
-type snapshotDTO struct {
-	Version  int               `json:"version"`
-	Header   []ui.ColumnMeta   `json:"header"`
-	Rows     []rowDTO          `json:"rows"`
-	Marked   map[string]string `json:"marked"`   // MarkColor as string; uint64 keys stringified
-	Comments map[string]string `json:"comments"` // uint64 keys stringified
-	TimeWin  *timeWindowDTO    `json:"timeWindow,omitempty"`
-	Note     string            `json:"note,omitempty"`
-}
-
 type timeWindowDTO struct {
 	Enabled bool   `json:"enabled"`
 	Start   string `json:"start"`
 	End     string `json:"end"`
+}
+
+type compactColumnLayout struct {
+	Role     ui.ColumnRole
+	Visible  bool
+	MinWidth int
+	Weight   float64
 }
 
 type metaOnlyDTO struct {
@@ -188,63 +192,502 @@ func ExportModel(m *Model, path string) error {
 
 // SaveModel writes the entire model to a JSON file.
 func SaveModel(m *Model, path string) error {
-	dto := snapshotDTO{
-		Version:  snapshotVersion,
-		Header:   nil, // filled below
-		Rows:     make([]rowDTO, 0, len(m.table.rows)),
-		Marked:   u64KeyToStringMarkMap(m.table.markedRows),
-		Comments: u64KeyToStringStringMap(m.table.commentRows),
-	}
-	dto.TimeWin = &timeWindowDTO{
-		Enabled: m.table.timeWindow.Enabled,
-		Start:   m.table.timeWindow.Start.Format(time.RFC3339Nano),
-		End:     m.table.timeWindow.End.Format(time.RFC3339Nano),
-	}
-
-	// Copy header metadata
-	if len(m.table.header) > 0 {
-		dto.Header = make([]ui.ColumnMeta, len(m.table.header))
-		copy(dto.Header, m.table.header)
-	}
-
-	// Copy rows
-	for _, r := range m.table.rows {
-		dto.Rows = append(dto.Rows, toDTORow(r))
-	}
-
-	data, err := json.MarshalIndent(dto, "", "  ")
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o600)
+
+	w := bufio.NewWriterSize(f, 1<<20)
+	if err := writeCompactSnapshot(w, m); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if err := w.Flush(); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }
 
 // LoadModel replaces the contents of m with the snapshot from path.
 func LoadModel(m *Model, path string) error {
-	data, err := os.ReadFile(path)
+	f, err := os.Open(path)
 	if err != nil {
 		return err
 	}
-	var dto snapshotDTO
-	if err := json.Unmarshal(data, &dto); err != nil {
+	defer f.Close()
+	return loadModelFromReader(m, f)
+}
+
+func writeCompactSnapshot(w io.Writer, m *Model) error {
+	if err := writeLiteral(w, "{\n\"version\":"); err != nil {
 		return err
 	}
-	if dto.Version != snapshotVersion {
-		return fmt.Errorf("snapshot version %d not supported (want %d)", dto.Version, snapshotVersion)
+	if err := writeJSONValue(w, snapshotVersion); err != nil {
+		return fmt.Errorf("encode version: %w", err)
+	}
+	if err := writeLiteral(w, ",\n\"rowID\":"); err != nil {
+		return err
+	}
+	if err := writeJSONValue(w, rowIDAlgorithm); err != nil {
+		return fmt.Errorf("encode rowID: %w", err)
+	}
+	if err := writeLiteral(w, ",\n\"header\":"); err != nil {
+		return err
+	}
+	if err := writeJSONValue(w, snapshotHeaderNames(m.table.header)); err != nil {
+		return fmt.Errorf("encode header: %w", err)
+	}
+	if layouts := snapshotColumnLayouts(m.table.header); len(layouts) > 0 {
+		if err := writeLiteral(w, ",\n\"columnLayout\":"); err != nil {
+			return err
+		}
+		if err := writeJSONValue(w, layouts); err != nil {
+			return fmt.Errorf("encode column layout: %w", err)
+		}
+	}
+	if err := writeLiteral(w, ",\n\"rows\":[\n"); err != nil {
+		return err
+	}
+	for i, r := range m.table.rows {
+		if i > 0 {
+			if err := writeLiteral(w, ",\n"); err != nil {
+				return err
+			}
+		}
+		if err := writeJSONValue(w, r.Cols); err != nil {
+			return fmt.Errorf("encode row %d: %w", i, err)
+		}
+	}
+	if err := writeLiteral(w, "\n]"); err != nil {
+		return err
 	}
 
-	// Restore header
-	m.table.header = m.table.header[:0]
-	if len(dto.Header) > 0 {
-		m.table.header = make([]ui.ColumnMeta, len(dto.Header))
-		copy(m.table.header, dto.Header)
+	if spans := buildOriginalIndexSpans(m.table.rows); len(spans) > 0 {
+		if err := writeLiteral(w, ",\n\"originalIndexSpans\":"); err != nil {
+			return err
+		}
+		if err := writeJSONValue(w, spans); err != nil {
+			return fmt.Errorf("encode original indexes: %w", err)
+		}
 	}
 
-	// Restore rows
-	m.table.rows = m.table.rows[:0]
-	for _, dr := range dto.Rows {
-		m.table.rows = append(m.table.rows, fromDTORow(dr))
+	if marked := u64KeyToStringMarkMap(m.table.markedRows); len(marked) > 0 {
+		if err := writeLiteral(w, ",\n\"marked\":"); err != nil {
+			return err
+		}
+		if err := writeJSONValue(w, marked); err != nil {
+			return fmt.Errorf("encode marked rows: %w", err)
+		}
 	}
+
+	if comments := u64KeyToStringStringMap(m.table.commentRows); len(comments) > 0 {
+		if err := writeLiteral(w, ",\n\"comments\":"); err != nil {
+			return err
+		}
+		if err := writeJSONValue(w, comments); err != nil {
+			return fmt.Errorf("encode comments: %w", err)
+		}
+	}
+
+	if timeWin := snapshotTimeWindow(m); timeWin != nil {
+		if err := writeLiteral(w, ",\n\"timeWindow\":"); err != nil {
+			return err
+		}
+		if err := writeJSONValue(w, timeWin); err != nil {
+			return fmt.Errorf("encode time window: %w", err)
+		}
+	}
+
+	return writeLiteral(w, "\n}\n")
+}
+
+func writeLiteral(w io.Writer, s string) error {
+	_, err := io.WriteString(w, s)
+	return err
+}
+
+func writeJSONValue(w io.Writer, v any) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	_, err = w.Write(data)
+	return err
+}
+
+func snapshotHeaderNames(header []ui.ColumnMeta) []string {
+	if len(header) == 0 {
+		return nil
+	}
+	names := make([]string, len(header))
+	for i := range header {
+		names[i] = header[i].Name
+	}
+	return names
+}
+
+func snapshotColumnLayouts(header []ui.ColumnMeta) []compactColumnLayout {
+	if len(header) == 0 {
+		return nil
+	}
+	layouts := make([]compactColumnLayout, len(header))
+	for i, col := range header {
+		layouts[i] = compactColumnLayout{
+			Role:     col.Role,
+			Visible:  col.Visible,
+			MinWidth: col.MinWidth,
+			Weight:   col.Weight,
+		}
+	}
+	return layouts
+}
+
+func (l compactColumnLayout) MarshalJSON() ([]byte, error) {
+	return json.Marshal([]any{int(l.Role), l.Visible, l.MinWidth, l.Weight})
+}
+
+func (l *compactColumnLayout) UnmarshalJSON(data []byte) error {
+	var values []json.RawMessage
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+	if len(values) != 4 {
+		return fmt.Errorf("column layout has %d values, want 4", len(values))
+	}
+	var role int
+	if err := json.Unmarshal(values[0], &role); err != nil {
+		return fmt.Errorf("role: %w", err)
+	}
+	var visible bool
+	if err := json.Unmarshal(values[1], &visible); err != nil {
+		return fmt.Errorf("visible: %w", err)
+	}
+	var minWidth int
+	if err := json.Unmarshal(values[2], &minWidth); err != nil {
+		return fmt.Errorf("min width: %w", err)
+	}
+	var weight float64
+	if err := json.Unmarshal(values[3], &weight); err != nil {
+		return fmt.Errorf("weight: %w", err)
+	}
+	*l = compactColumnLayout{
+		Role:     ui.ColumnRole(role),
+		Visible:  visible,
+		MinWidth: minWidth,
+		Weight:   weight,
+	}
+	return nil
+}
+
+func snapshotTimeWindow(m *Model) *timeWindowDTO {
+	if !m.table.timeWindow.Enabled {
+		return nil
+	}
+	return &timeWindowDTO{
+		Enabled: true,
+		Start:   m.table.timeWindow.Start.Format(time.RFC3339Nano),
+		End:     m.table.timeWindow.End.Format(time.RFC3339Nano),
+	}
+}
+
+func buildOriginalIndexSpans(rows []Row) [][]int {
+	var spans [][]int
+	currentDelta := 0
+	for i, row := range rows {
+		originalIndex := row.OriginalIndex
+		if originalIndex <= 0 {
+			originalIndex = i + 1
+		}
+		delta := originalIndex - (i + 1)
+		if i == 0 {
+			currentDelta = delta
+			if delta != 0 {
+				spans = append(spans, []int{0, delta})
+			}
+			continue
+		}
+		if delta != currentDelta {
+			spans = append(spans, []int{i, delta})
+			currentDelta = delta
+		}
+	}
+	return spans
+}
+
+func loadModelFromReader(m *Model, r io.Reader) error {
+	dec := json.NewDecoder(bufio.NewReaderSize(r, 1<<20))
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '{' {
+		return fmt.Errorf("snapshot: expected JSON object")
+	}
+
+	version := legacySnapshotVersion
+	var header []ui.ColumnMeta
+	var columnLayouts []compactColumnLayout
+	var rows []Row
+	var marked map[string]string
+	var comments map[string]string
+	var timeWin *timeWindowDTO
+	var originalIndexSpans [][]int
+
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		field, ok := tok.(string)
+		if !ok {
+			return fmt.Errorf("snapshot: expected field name")
+		}
+
+		switch field {
+		case "version":
+			if err := dec.Decode(&version); err != nil {
+				return fmt.Errorf("decode version: %w", err)
+			}
+			if version != legacySnapshotVersion && version != snapshotVersion {
+				return fmt.Errorf("snapshot version %d not supported (want %d or %d)", version, legacySnapshotVersion, snapshotVersion)
+			}
+		case "rowID":
+			var algorithm string
+			if err := dec.Decode(&algorithm); err != nil {
+				return fmt.Errorf("decode rowID: %w", err)
+			}
+			if algorithm != "" && algorithm != rowIDAlgorithm {
+				return fmt.Errorf("snapshot rowID algorithm %q not supported (want %q)", algorithm, rowIDAlgorithm)
+			}
+		case "header":
+			header, err = decodeSnapshotHeader(dec)
+			if err != nil {
+				return fmt.Errorf("decode header: %w", err)
+			}
+		case "columnLayout":
+			if err := dec.Decode(&columnLayouts); err != nil {
+				return fmt.Errorf("decode column layout: %w", err)
+			}
+		case "rows":
+			rows, err = decodeSnapshotRows(dec, version)
+			if err != nil {
+				return err
+			}
+		case "originalIndexSpans":
+			if err := dec.Decode(&originalIndexSpans); err != nil {
+				return fmt.Errorf("decode original indexes: %w", err)
+			}
+		case "marked":
+			if err := dec.Decode(&marked); err != nil {
+				return fmt.Errorf("decode marked rows: %w", err)
+			}
+		case "comments":
+			if err := dec.Decode(&comments); err != nil {
+				return fmt.Errorf("decode comments: %w", err)
+			}
+		case "timeWindow":
+			if err := dec.Decode(&timeWin); err != nil {
+				return fmt.Errorf("decode time window: %w", err)
+			}
+		default:
+			if err := skipJSONValue(dec); err != nil {
+				return fmt.Errorf("decode %s: %w", field, err)
+			}
+		}
+	}
+
+	tok, err = dec.Token()
+	if err != nil {
+		return err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '}' {
+		return fmt.Errorf("snapshot: expected end of JSON object")
+	}
+
+	if len(columnLayouts) > 0 {
+		if err := applyColumnLayouts(header, columnLayouts); err != nil {
+			return err
+		}
+	}
+	if version == snapshotVersion {
+		if err := applyOriginalIndexSpans(rows, originalIndexSpans); err != nil {
+			return err
+		}
+	}
+	return restoreLoadedSnapshot(m, header, rows, marked, comments, timeWin)
+}
+
+func decodeSnapshotHeader(dec *json.Decoder) ([]ui.ColumnMeta, error) {
+	var raw json.RawMessage
+	if err := dec.Decode(&raw); err != nil {
+		return nil, err
+	}
+
+	var legacy []ui.ColumnMeta
+	if err := json.Unmarshal(raw, &legacy); err == nil {
+		return legacy, nil
+	}
+
+	var names []string
+	if err := json.Unmarshal(raw, &names); err != nil {
+		return nil, err
+	}
+	header := make([]ui.ColumnMeta, len(names))
+	for i, name := range names {
+		header[i] = ui.ColumnMeta{
+			Name:     name,
+			Index:    i,
+			Role:     ui.RoleNormal,
+			Visible:  true,
+			MinWidth: 8,
+			Weight:   1,
+		}
+	}
+	return header, nil
+}
+
+func applyColumnLayouts(header []ui.ColumnMeta, layouts []compactColumnLayout) error {
+	if len(layouts) != len(header) {
+		return fmt.Errorf("column layout count %d does not match header count %d", len(layouts), len(header))
+	}
+	for i, layout := range layouts {
+		header[i].Index = i
+		header[i].Role = layout.Role
+		header[i].Visible = layout.Visible
+		header[i].MinWidth = layout.MinWidth
+		header[i].Weight = layout.Weight
+		header[i].Width = 0
+	}
+	return nil
+}
+
+func decodeSnapshotRows(dec *json.Decoder, version int) ([]Row, error) {
+	if version == legacySnapshotVersion {
+		return decodeLegacyRows(dec)
+	}
+	return decodeCompactRows(dec)
+}
+
+func decodeLegacyRows(dec *json.Decoder) ([]Row, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '[' {
+		return nil, fmt.Errorf("snapshot rows: expected array")
+	}
+
+	rows := make([]Row, 0, 1024)
+	rowIndex := 0
+	for dec.More() {
+		var dto rowDTO
+		if err := dec.Decode(&dto); err != nil {
+			return nil, fmt.Errorf("decode row %d: %w", rowIndex, err)
+		}
+		row := fromDTORow(dto)
+		if row.OriginalIndex <= 0 {
+			row.OriginalIndex = rowIndex + 1
+		}
+		rows = append(rows, row)
+		rowIndex++
+	}
+
+	tok, err = dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != ']' {
+		return nil, fmt.Errorf("snapshot rows: expected end of array")
+	}
+	return rows, nil
+}
+
+func decodeCompactRows(dec *json.Decoder) ([]Row, error) {
+	tok, err := dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != '[' {
+		return nil, fmt.Errorf("snapshot rows: expected array")
+	}
+
+	rows := make([]Row, 0, 1024)
+	rowIndex := 0
+	for dec.More() {
+		var cols []string
+		if err := dec.Decode(&cols); err != nil {
+			return nil, fmt.Errorf("decode row %d: %w", rowIndex, err)
+		}
+		row := Row{
+			Cols:          cols,
+			OriginalIndex: rowIndex + 1,
+		}
+		row.ID = row.ComputeID()
+		rows = append(rows, row)
+		rowIndex++
+	}
+
+	tok, err = dec.Token()
+	if err != nil {
+		return nil, err
+	}
+	if delim, ok := tok.(json.Delim); !ok || delim != ']' {
+		return nil, fmt.Errorf("snapshot rows: expected end of array")
+	}
+	return rows, nil
+}
+
+func applyOriginalIndexSpans(rows []Row, spans [][]int) error {
+	if len(spans) == 0 {
+		return nil
+	}
+	prevStart := -1
+	for _, span := range spans {
+		if len(span) != 2 {
+			return fmt.Errorf("invalid originalIndexSpans entry %v", span)
+		}
+		start := span[0]
+		if start < 0 || start >= len(rows) {
+			return fmt.Errorf("originalIndexSpans start %d out of range", start)
+		}
+		if start <= prevStart {
+			return fmt.Errorf("originalIndexSpans start %d not greater than previous %d", start, prevStart)
+		}
+		prevStart = start
+	}
+
+	spanIndex := 0
+	delta := 0
+	for i := range rows {
+		if spanIndex < len(spans) && spans[spanIndex][0] == i {
+			delta = spans[spanIndex][1]
+			spanIndex++
+		}
+		originalIndex := i + 1 + delta
+		if originalIndex <= 0 {
+			return fmt.Errorf("original index for row %d is %d", i, originalIndex)
+		}
+		rows[i].OriginalIndex = originalIndex
+	}
+	return nil
+}
+
+func skipJSONValue(dec *json.Decoder) error {
+	var discard json.RawMessage
+	return dec.Decode(&discard)
+}
+
+func restoreLoadedSnapshot(
+	m *Model,
+	header []ui.ColumnMeta,
+	rows []Row,
+	marked map[string]string,
+	comments map[string]string,
+	timeWin *timeWindowDTO,
+) error {
+	m.table.header = append([]ui.ColumnMeta(nil), header...)
+	m.table.rows = rows
 	m.table.showOnlyMarked = false
 	m.table.filterPattern = ""
 	m.table.filterEnabled = false
@@ -263,30 +706,29 @@ func LoadModel(m *Model, path string) error {
 	m.table.timeMax = time.Time{}
 	m.table.timeColumnIndex = -1
 	m.table.derivedTimeData = false
+	m.table.timeWindow = featuretimewindow.Window{}
 
-	// Restore marks/comments
 	var errMarks, errComments error
-	m.table.markedRows, errMarks = parseUintKeyMapMark(dto.Marked)
+	m.table.markedRows, errMarks = parseUintKeyMapMark(marked)
 	if errMarks != nil {
 		return errMarks
 	}
-	m.table.commentRows, errComments = parseUintKeyMapString(dto.Comments)
+	m.table.commentRows, errComments = parseUintKeyMapString(comments)
 	if errComments != nil {
 		return errComments
 	}
 
-	// Restore time window (bounds recomputed in InitialiseUI)
-	if dto.TimeWin != nil {
-		start, err := time.Parse(time.RFC3339Nano, dto.TimeWin.Start)
-		if err != nil && dto.TimeWin.Start != "" {
+	if timeWin != nil {
+		start, err := time.Parse(time.RFC3339Nano, timeWin.Start)
+		if err != nil && timeWin.Start != "" {
 			return fmt.Errorf("invalid timeWindow start: %w", err)
 		}
-		end, err := time.Parse(time.RFC3339Nano, dto.TimeWin.End)
-		if err != nil && dto.TimeWin.End != "" {
+		end, err := time.Parse(time.RFC3339Nano, timeWin.End)
+		if err != nil && timeWin.End != "" {
 			return fmt.Errorf("invalid timeWindow end: %w", err)
 		}
 		m.table.timeWindow = featuretimewindow.Window{
-			Enabled: dto.TimeWin.Enabled,
+			Enabled: timeWin.Enabled,
 			Start:   start,
 			End:     end,
 		}
@@ -298,7 +740,7 @@ func LoadModel(m *Model, path string) error {
 // SaveMeta writes only marks/comments so they can be re-applied after a fresh CSV import.
 func SaveMeta(m *Model, path string) error {
 	dto := metaOnlyDTO{
-		Version:  snapshotVersion,
+		Version:  metaVersion,
 		Marked:   u64KeyToStringMarkMap(m.table.markedRows),
 		Comments: u64KeyToStringStringMap(m.table.commentRows),
 	}
@@ -319,8 +761,8 @@ func LoadMeta(m *Model, path string) error {
 	if err := json.Unmarshal(data, &dto); err != nil {
 		return err
 	}
-	if dto.Version != snapshotVersion {
-		return fmt.Errorf("meta version %d not supported (want %d)", dto.Version, snapshotVersion)
+	if dto.Version != metaVersion {
+		return fmt.Errorf("meta version %d not supported (want %d)", dto.Version, metaVersion)
 	}
 
 	if m.table.markedRows == nil {

@@ -93,27 +93,32 @@ func TestLoadModelAutoLoadsSavedJSONSnapshot(t *testing.T) {
 	}
 
 	var snapshot struct {
-		Rows []struct {
-			Cols []string `json:"cols"`
-		} `json:"rows"`
+		Version int        `json:"version"`
+		Rows    [][]string `json:"rows"`
 	}
 	if err := json.Unmarshal(data, &snapshot); err != nil {
 		t.Fatalf("unmarshal resaved snapshot: %v", err)
 	}
 
+	if snapshot.Version != 2 {
+		t.Fatalf("snapshot version = %d want 2", snapshot.Version)
+	}
 	if len(snapshot.Rows) != 1 {
 		t.Fatalf("row count = %d want 1", len(snapshot.Rows))
 	}
-	if got, want := len(snapshot.Rows[0].Cols), 6; got != want {
+	if got, want := len(snapshot.Rows[0]), 6; got != want {
 		t.Fatalf("column count = %d want %d", got, want)
 	}
-	if got, want := snapshot.Rows[0].Cols[3], "proc-name"; got != want {
+	if got, want := snapshot.Rows[0][3], "proc-name"; got != want {
 		t.Fatalf("process column = %q want %q", got, want)
 	}
-	if got, want := snapshot.Rows[0].Cols[5], "some long value here"; got != want {
+	if got, want := snapshot.Rows[0][5], "some long value here"; got != want {
 		t.Fatalf("value column = %q want %q", got, want)
 	}
 	if !strings.Contains(string(data), "\"rows\"") {
 		t.Fatalf("resaved snapshot missing rows payload")
+	}
+	if strings.Contains(string(data), "\"cols\"") {
+		t.Fatalf("resaved snapshot should use compact row arrays, got legacy cols keys")
 	}
 }
