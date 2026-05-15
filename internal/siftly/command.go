@@ -74,7 +74,7 @@ var commandMetaTable = map[Command]commandMeta{
 		Label:  "MARK",
 		Badge:  "[m]",
 		Prompt: "mark: ",
-		Hints:  "r/g/a: mark   c: clear   esc: cancel",
+		Hints:  "[count] r/g/a: mark   [count] c: clear   esc: cancel",
 	},
 	CmdTimeWindowSet: {
 		Label:  "WINDOW",
