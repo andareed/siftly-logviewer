@@ -136,8 +136,7 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Show Marks only
 		logging.Infof("Toggle for Show Marks Only has been pressed")
 		m.table.showOnlyMarked = !m.table.showOnlyMarked
-		cmd = m.view.notice.Start(fmt.Sprintf("'Show Only Marked Rows' toggled {%t}", m.table.showOnlyMarked), "", noticeDuration)
-		m.applyFilter()
+		cmd = m.startFilterOperation(fmt.Sprintf("Show only marked: %t", m.table.showOnlyMarked))
 	case viewActionNextMark:
 		// Next mark jump
 		logging.Debug("Here we go; jumping to the next mark")
@@ -156,14 +155,14 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ready = true
 	case viewActionToggleFilter:
 		logging.Infof("Shift F, toggling Filter")
-		if !m.toggleFilter() {
+		if !m.toggleFilterState() {
 			cmd = m.view.notice.Start("No filter configured", "warn", noticeDuration)
 			break
 		}
 		if m.table.filterEnabled {
-			cmd = m.view.notice.Start("Filter enabled", "", noticeDuration)
+			cmd = m.startFilterOperation("Filter enabled")
 		} else {
-			cmd = m.view.notice.Start("Filter disabled", "", noticeDuration)
+			cmd = m.startFilterOperation("Filter disabled")
 		}
 	case viewActionToggleGraph:
 		if m.graphConfig.Enabled {

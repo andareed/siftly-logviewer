@@ -44,13 +44,13 @@ func runSearchCommand(m *Model, raw string) tea.Cmd {
 }
 
 func runFilterCommand(m *Model, raw string) tea.Cmd {
-	if err := m.setFilterPattern(raw); err != nil {
+	if err := m.prepareFilterPattern(raw); err != nil {
 		return m.view.notice.Start("Invalid filter", "warn", noticeDuration)
 	}
 	if err := m.recordFilterHistory(raw); err != nil {
-		return m.view.notice.Start("Filter history error", "warn", noticeDuration)
+		return m.startFilterOperationWithKind("Filter applied; history error", "warn")
 	}
-	return nil
+	return m.startFilterOperation("Filter applied")
 }
 
 func runSortCommand(m *Model, raw string) tea.Cmd {

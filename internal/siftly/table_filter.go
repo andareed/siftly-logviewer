@@ -1,6 +1,30 @@
 package siftly
 
-import "github.com/andareed/siftly-hostlog/internal/shared/logging"
+import (
+	"regexp"
+	"time"
+
+	"github.com/andareed/siftly-hostlog/internal/shared/logging"
+	featuretimewindow "github.com/andareed/siftly-hostlog/internal/siftly/features/timewindow"
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
+)
+
+type filterJob struct {
+	rows            []Row
+	rowOrder        []int
+	markedRows      map[uint64]ui.MarkColor
+	showOnlyMarked  bool
+	filterEnabled   bool
+	filterRegex     *regexp.Regexp
+	filterWholeRow  bool
+	searchColumns   []int
+	timeWindow      featuretimewindow.Window
+	rowTimes        []time.Time
+	rowHasTimes     []bool
+	timeWindowOn    bool
+	currentRowHash  uint64
+	completionLabel string
+}
 
 func (m *Model) applyFilter() {
 	logging.Debugf("applyFilter called")
@@ -50,4 +74,60 @@ func copyIntSlice(dst, src []int) []int {
 	}
 	copy(dst, src)
 	return dst
+}
+
+func (j filterJob) run() []int {
+	if !j.filterActive() && !j.showOnlyMarked && !j.timeWindowOn {
+		out := make([]int, len(j.rowOrder))
+		copy(out, j.rowOrder)
+		return out
+	}
+
+	filtered := make([]int, 0, len(j.rowOrder))
+	for _, rowIdx := range j.rowOrder {
+		if rowIdx < 0 || rowIdx >= len(j.rows) {
+			continue
+		}
+		row := j.rows[rowIdx]
+		if j.includeRow(row, rowIdx) {
+			filtered = append(filtered, rowIdx)
+		}
+	}
+	return filtered
+}
+
+func (j filterJob) filterActive() bool {
+	return j.filterEnabled && j.filterRegex != nil
+}
+
+func (j filterJob) includeRow(row Row, rowIndex int) bool {
+	if j.showOnlyMarked {
+		if _, ok := j.markedRows[row.ID]; !ok {
+			return false
+		}
+	}
+
+	if j.timeWindowOn {
+		if rowIndex < 0 || rowIndex >= len(j.rowHasTimes) {
+			return false
+		}
+		if !j.rowHasTimes[rowIndex] {
+			return false
+		}
+		ts := j.rowTimes[rowIndex]
+		if ts.Before(j.timeWindow.Start) || ts.After(j.timeWindow.End) {
+			return false
+		}
+	}
+
+	if j.filterActive() {
+		match := row.MatchesColumns(j.filterRegex, j.searchColumns)
+		if !match && j.filterWholeRow {
+			match = j.filterRegex.MatchString(row.String())
+		}
+		if !match {
+			return false
+		}
+	}
+	return true
 }

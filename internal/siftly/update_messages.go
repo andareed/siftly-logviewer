@@ -19,6 +19,12 @@ func (m *Model) handleSystemMsg(msg tea.Msg) (tea.Cmd, bool) {
 	case ui.ClearNoticeMsg:
 		m.view.notice.ApplyClear(msg)
 		return nil, true
+	case operationTickMsg:
+		return m.handleOperationTick(msg), true
+	case saveCompleteMsg:
+		return m.handleSaveComplete(msg), true
+	case filterCompleteMsg:
+		return m.handleFilterComplete(msg), true
 	}
 	return nil, false
 }
@@ -90,11 +96,7 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 		return nil
 	case dialogs.ActionSaveConfirm:
 		m.hideActiveDialog()
-		if err := SaveModel(m, action.Path); err != nil {
-			return m.view.notice.Start("Error", "", noticeDuration)
-		}
-		m.fileName = action.Path
-		return m.view.notice.Start("Saved succeeded", "", noticeDuration)
+		return m.startSaveOperation(action.Path)
 	case dialogs.ActionSaveCancel:
 		m.hideActiveDialog()
 		return nil

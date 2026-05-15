@@ -94,6 +94,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd, handled := m.handleSystemMsg(msg); handled {
 		return m, cmd
 	}
+	if m.view.operation.active {
+		return m, nil
+	}
 	if cmd, handled := m.handleDialogInput(msg); handled {
 		return m, cmd
 	}

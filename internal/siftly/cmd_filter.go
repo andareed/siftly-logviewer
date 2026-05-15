@@ -8,9 +8,17 @@ import (
 )
 
 func (m *Model) setFilterPattern(pattern string) error {
+	if err := m.prepareFilterPattern(pattern); err != nil {
+		return err
+	}
+	m.applyFilter()
+	return nil
+}
+
+func (m *Model) prepareFilterPattern(pattern string) error {
 	logging.Infof("Setting Pattern to: %s", pattern)
 	if pattern == "" {
-		m.clearFilter()
+		m.clearFilterState()
 	} else {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
@@ -20,25 +28,35 @@ func (m *Model) setFilterPattern(pattern string) error {
 		m.table.filterEnabled = true
 		m.table.filterRegex = re
 		m.table.filterWholeRow = filterRequiresWholeRow(pattern)
-		m.applyFilter()
 	}
 	return nil
 }
 
 func (m *Model) clearFilter() {
+	m.clearFilterState()
+	m.applyFilter()
+}
+
+func (m *Model) clearFilterState() {
 	m.table.filterPattern = ""
 	m.table.filterEnabled = false
 	m.table.filterRegex = nil
 	m.table.filterWholeRow = false
-	m.applyFilter()
 }
 
 func (m *Model) toggleFilter() bool {
+	if !m.toggleFilterState() {
+		return false
+	}
+	m.applyFilter()
+	return true
+}
+
+func (m *Model) toggleFilterState() bool {
 	if strings.TrimSpace(m.table.filterPattern) == "" || m.table.filterRegex == nil {
 		return false
 	}
 	m.table.filterEnabled = !m.table.filterEnabled
-	m.applyFilter()
 	return true
 }
 

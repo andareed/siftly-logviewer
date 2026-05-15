@@ -40,6 +40,7 @@ type viewState struct {
 	drawerOpen              bool
 	drawerHeight            int
 	notice                  ui.NoticeState
+	operation               operationState
 	searchQuery             string
 	lastColumnsSpec         string
 	pendingViewPrefix       string
