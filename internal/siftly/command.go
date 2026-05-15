@@ -21,9 +21,9 @@ const (
 )
 
 type CommandInput struct {
-	cmd   Command
-	input textinput.Model
-	ready bool
+	cmd         Command
+	input       textinput.Model
+	initialized bool
 }
 
 type commandMeta struct {
@@ -148,7 +148,7 @@ func (m *Model) activeCommandLine() string {
 	return badge + " " + prompt + m.commandValue() + m.commandPreviewSuffix()
 }
 
-// enterCommand switches the UI to command mode, seeds the input buffer,
+// enterCommand switches the UI to command mode, seeds the input value,
 // and optionally refreshes the view or shows a hint notice.
 func (m *Model) enterCommand(cmd Command, seed string, showHint bool, refresh bool) tea.Cmd {
 	value := seed
@@ -182,6 +182,15 @@ func (m *Model) exitCommand(refresh bool) tea.Cmd {
 	return nil
 }
 
+func commandUsesTextInput(cmd Command) bool {
+	switch cmd {
+	case CmdJump, CmdSearch, CmdFilter, CmdSort, CmdComment, CmdColumns, CmdColumnOrder:
+		return true
+	default:
+		return false
+	}
+}
+
 func newCommandInput(cmd Command, value string) CommandInput {
 	input := textinput.New()
 	input.Prompt = ""
@@ -191,25 +200,25 @@ func newCommandInput(cmd Command, value string) CommandInput {
 	input.SetValue(value)
 	input.CursorEnd()
 	input.Focus()
-	return CommandInput{cmd: cmd, input: input, ready: true}
+	return CommandInput{cmd: cmd, input: input, initialized: true}
 }
 
-func (m *Model) ensureCommandInput() {
-	if m.view.command.ready {
+func (m *Model) ensureCommandTextInput() {
+	if m.view.command.initialized {
 		return
 	}
 	m.view.command = newCommandInput(m.view.command.cmd, "")
 }
 
 func (m *Model) commandValue() string {
-	if !m.view.command.ready {
+	if !m.view.command.initialized {
 		return ""
 	}
 	return m.view.command.input.Value()
 }
 
 func (m *Model) setCommandValue(value string) {
-	m.ensureCommandInput()
+	m.ensureCommandTextInput()
 	m.view.command.input.SetValue(value)
 	m.view.command.input.CursorEnd()
 	m.view.command.input.Focus()

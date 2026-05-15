@@ -1,8 +1,14 @@
 package todaylog
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/andareed/siftly-hostlog/internal/siftly"
 )
 
 func TestParseStatsLine(t *testing.T) {
@@ -46,5 +52,68 @@ func TestParseStatsLineReportsShortInput(t *testing.T) {
 	}
 	if count != 5 {
 		t.Fatalf("field count = %d want 5", count)
+	}
+}
+
+func TestLoadModelAutoLoadsSavedJSONSnapshot(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "today.log")
+	if err := os.WriteFile(logPath, []byte("0 1713878400 proc-name 123 metric_name some long value here\n"), 0o600); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+
+	original, err := LoadModelAuto(logPath)
+	if err != nil {
+		t.Fatalf("load source log: %v", err)
+	}
+
+	snapshotPath := filepath.Join(dir, "today.json")
+	if err := siftly.SaveModel(original, snapshotPath); err != nil {
+		t.Fatalf("save snapshot: %v", err)
+	}
+
+	reopened, err := LoadModelAuto(snapshotPath)
+	if err != nil {
+		t.Fatalf("reopen snapshot: %v", err)
+	}
+	if reopened.InitialPath != snapshotPath {
+		t.Fatalf("InitialPath = %q want %q", reopened.InitialPath, snapshotPath)
+	}
+
+	resavedPath := filepath.Join(dir, "today-roundtrip.json")
+	if err := siftly.SaveModel(reopened, resavedPath); err != nil {
+		t.Fatalf("resave snapshot: %v", err)
+	}
+
+	data, err := os.ReadFile(resavedPath)
+	if err != nil {
+		t.Fatalf("read resaved snapshot: %v", err)
+	}
+
+	var snapshot struct {
+		Rows []struct {
+			Cols []string `json:"cols"`
+		} `json:"rows"`
+	}
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatalf("unmarshal resaved snapshot: %v", err)
+	}
+
+	if len(snapshot.Rows) != 1 {
+		t.Fatalf("row count = %d want 1", len(snapshot.Rows))
+	}
+	if got, want := len(snapshot.Rows[0].Cols), 6; got != want {
+		t.Fatalf("column count = %d want %d", got, want)
+	}
+	if got, want := snapshot.Rows[0].Cols[3], "proc-name"; got != want {
+		t.Fatalf("process column = %q want %q", got, want)
+	}
+	if got, want := snapshot.Rows[0].Cols[5], "some long value here"; got != want {
+		t.Fatalf("value column = %q want %q", got, want)
+	}
+	if !strings.Contains(string(data), "\"rows\"") {
+		t.Fatalf("resaved snapshot missing rows payload")
 	}
 }

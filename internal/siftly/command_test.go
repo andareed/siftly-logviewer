@@ -128,7 +128,7 @@ func TestSnapshotAppFrameMatchesLiveAppFrame(t *testing.T) {
 	}
 }
 
-func TestHandleCommandKeyAppendsBatchedRunes(t *testing.T) {
+func TestCommandInputAcceptsBatchedRunes(t *testing.T) {
 	m := &Model{}
 	_ = m.enterCommand(CmdFilter, "", false, false)
 
@@ -137,7 +137,31 @@ func TestHandleCommandKeyAppendsBatchedRunes(t *testing.T) {
 		t.Fatalf("batched runes should not return command")
 	}
 	if got := m.commandValue(); got != "va.msg" {
-		t.Fatalf("command buffer = %q, want %q", got, "va.msg")
+		t.Fatalf("command value = %q, want %q", got, "va.msg")
+	}
+}
+
+func TestCommandInputUsesTextInputCursorEditing(t *testing.T) {
+	m := &Model{}
+	_ = m.enterCommand(CmdFilter, "", false, false)
+
+	_, _ = m.handleCommandKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("ab")})
+	_, _ = m.handleCommandKey(tea.KeyMsg{Type: tea.KeyLeft})
+	_, _ = m.handleCommandKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("X")})
+	_, _ = m.handleCommandKey(tea.KeyMsg{Type: tea.KeyBackspace})
+
+	if got := m.commandValue(); got != "ab" {
+		t.Fatalf("command value after cursor editing = %q, want %q", got, "ab")
+	}
+}
+
+func TestCommandInputCtrlVReturnsPasteCommand(t *testing.T) {
+	m := &Model{}
+	_ = m.enterCommand(CmdFilter, "", false, false)
+
+	_, cmd := m.handleCommandKey(tea.KeyMsg{Type: tea.KeyCtrlV})
+	if cmd == nil {
+		t.Fatalf("ctrl+v should return textinput paste command")
 	}
 }
 

@@ -10,6 +10,8 @@ func (m *Model) panelWidth() int {
 	return panelW
 }
 
+// captureMainBodySnapshot caches the expensive body render while footer-only
+// command input changes. Correctness must not depend on this cache.
 func (m *Model) captureMainBodySnapshot(panelW int) {
 	if !m.ready {
 		return

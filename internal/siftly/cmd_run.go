@@ -104,15 +104,8 @@ func runCommentCommand(m *Model, raw string) tea.Cmd {
 	return m.view.notice.Start("Comment added", "", noticeDuration)
 }
 
-func (m *Model) handleCommandMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
-	if m.view.mode != modeCommand {
-		return m, nil, false
-	}
-	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		next, cmd := m.handleCommandKey(keyMsg)
-		return next, cmd, true
-	}
-	if m.view.command.cmd == CmdMark || m.view.command.cmd == CmdTimeWindowSet {
+func (m *Model) handleCommandInputMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if m.view.mode != modeCommand || !commandUsesTextInput(m.view.command.cmd) {
 		return m, nil, false
 	}
 	return m, m.updateCommandInput(msg), true
@@ -134,9 +127,8 @@ func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// constrained command: mark
 	if m.view.command.cmd == CmdMark {
-		return m.handleMarkCommandKey(msg) // your tightened function
+		return m.handleMarkCommandKey(msg)
 	}
 	if m.view.command.cmd == CmdTimeWindowSet {
 		return m.handleTimeWindowSetCommandKey(msg)
@@ -149,11 +141,14 @@ func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(cmd, exitCmd)
 	}
 
+	if !commandUsesTextInput(m.view.command.cmd) {
+		return m, nil
+	}
 	return m, m.updateCommandInput(msg)
 }
 
 func (m *Model) updateCommandInput(msg tea.Msg) tea.Cmd {
-	m.ensureCommandInput()
+	m.ensureCommandTextInput()
 	var cmd tea.Cmd
 	m.view.command.input, cmd = m.view.command.input.Update(msg)
 

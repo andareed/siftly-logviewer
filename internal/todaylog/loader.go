@@ -27,9 +27,36 @@ const (
 func LoadModelAuto(path string) (*siftly.Model, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
+	case ".json":
+		return newModelFromJSONFile(path)
 	default:
 		return initiateModelFromStats(path)
 	}
+}
+
+func newModelFromJSONFile(path string) (*siftly.Model, error) {
+	defer logging.TimeOperation("load todaylog json")()
+
+	m := &siftly.Model{}
+	if err := siftly.LoadModel(m, path); err != nil {
+		return nil, err
+	}
+	m.InitialPath = path
+	m.SetStyles(SiftlyStyles())
+	m.SetGraphConfig(siftly.GraphConfig{
+		Enabled:      true,
+		TimeColumn:   "timestamp",
+		SeriesColumn: "key",
+		ValueColumn:  "value",
+		Height:       16,
+		MaxKeys:      8,
+		ScaleMode:    "log1p",
+		Aggregate:    "last",
+		Layout:       "overlay",
+		FillMode:     "none",
+	})
+	m.InitialiseView()
+	return m, nil
 }
 
 func initiateModelFromStats(statsFile string) (*siftly.Model, error) {
