@@ -22,23 +22,25 @@ const (
 //TODO Replace the name renderedRow, as these are not rendered anymore
 
 type Model struct {
-	viewport            viewport.Model
-	drawerPort          viewport.Model
-	ready               bool
-	cursor              int // index into rows
-	lastVisibleRowCount int
-	terminalHeight      int
-	terminalWidth       int
-	pageRowSize         int
-	activeDialog        dialogs.Dialog
-	filterConfig        FilterConfigSettings
-	fileName            string // filename the data will be saved to
-	InitialPath         string
-	lastExportFileName  string
-	view                viewState
-	table               tableState
-	styles              ui.Styles
-	graphConfig         GraphConfig
+	viewport                viewport.Model
+	drawerPort              viewport.Model
+	ready                   bool
+	cursor                  int // index into rows
+	lastVisibleRowCount     int
+	terminalHeight          int
+	terminalWidth           int
+	pageRowSize             int
+	activeDialog            dialogs.Dialog
+	filterConfig            FilterConfigSettings
+	fileName                string // filename the data will be saved to
+	InitialPath             string
+	lastExportFileName      string
+	lastGraphExportFileName string
+	view                    viewState
+	table                   tableState
+	styles                  ui.Styles
+	graphConfig             GraphConfig
+	fullSourceReload        FullSourceReloadFunc
 }
 
 // SetStyles injects UI styles from the wrapper package (e.g., hostlog).

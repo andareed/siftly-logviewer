@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func Run(statsFile, debugLogPath, filterPresetsPath, filterHistoryPath string) error {
+func Run(statsFile, debugLogPath, filterPresetsPath, filterHistoryPath, prefilter string) error {
 	cleanup, err := logging.SetupLogging(debugLogPath)
 	if err != nil {
 		return fmt.Errorf("Setup logging: %w", err)
@@ -16,7 +16,7 @@ func Run(statsFile, debugLogPath, filterPresetsPath, filterHistoryPath string) e
 	defer cleanup()
 
 	logging.Info("siftly-todaylog: Started")
-	m, err := LoadModelAuto(statsFile)
+	m, err := LoadModelAutoWithOptions(statsFile, LoadOptions{Prefilter: prefilter})
 
 	if err != nil {
 		return fmt.Errorf("Loading %q: %w", statsFile, err)

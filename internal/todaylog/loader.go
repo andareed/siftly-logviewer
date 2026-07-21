@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -24,13 +25,24 @@ const (
 	todaylogScannerBufferMax    = 16 * 1024 * 1024
 )
 
+type LoadOptions struct {
+	Prefilter string
+}
+
 func LoadModelAuto(path string) (*siftly.Model, error) {
+	return LoadModelAutoWithOptions(path, LoadOptions{})
+}
+
+func LoadModelAutoWithOptions(path string, opts LoadOptions) (*siftly.Model, error) {
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".json":
+		if strings.TrimSpace(opts.Prefilter) != "" {
+			return nil, fmt.Errorf("prefilter is only supported for raw todaylog files")
+		}
 		return newModelFromJSONFile(path)
 	default:
-		return initiateModelFromStats(path)
+		return initiateModelFromStats(path, opts)
 	}
 }
 
@@ -41,6 +53,12 @@ func newModelFromJSONFile(path string) (*siftly.Model, error) {
 	if err := siftly.LoadModel(m, path); err != nil {
 		return nil, err
 	}
+	configureTodaylogModel(m, path)
+	m.InitialiseView()
+	return m, nil
+}
+
+func configureTodaylogModel(m *siftly.Model, path string) {
 	m.InitialPath = path
 	m.SetStyles(SiftlyStyles())
 	m.SetGraphConfig(siftly.GraphConfig{
@@ -55,12 +73,15 @@ func newModelFromJSONFile(path string) (*siftly.Model, error) {
 		Layout:       "overlay",
 		FillMode:     "none",
 	})
-	m.InitialiseView()
-	return m, nil
 }
 
-func initiateModelFromStats(statsFile string) (*siftly.Model, error) {
+func initiateModelFromStats(statsFile string, opts LoadOptions) (*siftly.Model, error) {
 	defer logging.TimeOperation("load todaylog stats")()
+
+	prefilter, prefilterPattern, err := compileTodaylogPrefilter(opts.Prefilter)
+	if err != nil {
+		return nil, err
+	}
 
 	file, err := os.Open(statsFile)
 	if err != nil {
@@ -72,16 +93,17 @@ func initiateModelFromStats(statsFile string) (*siftly.Model, error) {
 	if err != nil {
 		return nil, err
 	}
-	if estimate, sampleBytes, sampleRows, err := estimateTodaylogRowCapacity(file); err != nil {
+	if estimate, sampleBytes, sampleRows, err := estimateTodaylogRowCapacity(file, prefilter); err != nil {
 		return nil, err
 	} else if estimate > 0 {
 		builder.ReserveRows(estimate)
 		if profile := logging.IsDebugMode(); profile {
 			logging.Infof(
-				"todaylog prealloc estimate: rows=%d sampleBytes=%d sampleRows=%d",
+				"todaylog prealloc estimate: rows=%d sampleBytes=%d sampleRows=%d prefilter=%q",
 				estimate,
 				sampleBytes,
 				sampleRows,
+				prefilterPattern,
 			)
 		}
 	}
@@ -97,10 +119,15 @@ func initiateModelFromStats(statsFile string) (*siftly.Model, error) {
 	lineNo := 0
 	rowCount := 0
 	skippedCount := 0
+	prefilterSkippedCount := 0
 	for scanner.Scan() {
 		lineNo++
 		line := strings.TrimSpace(scanner.Text())
 		if line == "" {
+			continue
+		}
+		if prefilter != nil && !prefilter.MatchString(line) {
+			prefilterSkippedCount++
 			continue
 		}
 
@@ -143,30 +170,36 @@ func initiateModelFromStats(statsFile string) (*siftly.Model, error) {
 	if profile {
 		buildDuration += time.Since(buildStart)
 		logging.Infof(
-			"todaylog loader phases: rows=%d skipped=%d parse=%s addRow=%s build=%s",
+			"todaylog loader phases: rows=%d skipped=%d prefilterSkipped=%d prefilter=%q parse=%s addRow=%s build=%s",
 			rowCount,
 			skippedCount,
+			prefilterSkippedCount,
+			prefilterPattern,
 			parseDuration.Round(time.Millisecond),
 			addRowDuration.Round(time.Millisecond),
 			buildDuration.Round(time.Millisecond),
 		)
 	}
-	m.InitialPath = statsFile
-	m.SetStyles(SiftlyStyles())
-	m.SetGraphConfig(siftly.GraphConfig{
-		Enabled:      true,
-		TimeColumn:   "timestamp",
-		SeriesColumn: "key",
-		ValueColumn:  "value",
-		Height:       16,
-		MaxKeys:      8,
-		ScaleMode:    "log1p",
-		Aggregate:    "last",
-		Layout:       "overlay",
-		FillMode:     "none",
-	})
+	configureTodaylogModel(m, statsFile)
+	if prefilter != nil {
+		m.SetFullSourceReload(func() (*siftly.Model, error) {
+			return LoadModelAutoWithOptions(statsFile, LoadOptions{})
+		})
+	}
 	m.InitialiseView()
 	return m, nil
+}
+
+func compileTodaylogPrefilter(pattern string) (*regexp.Regexp, string, error) {
+	pattern = strings.TrimSpace(pattern)
+	if pattern == "" {
+		return nil, "", nil
+	}
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, pattern, fmt.Errorf("compile prefilter %q: %w", pattern, err)
+	}
+	return re, pattern, nil
 }
 
 func parseStatsLine(line string) ([]string, int, error) {
@@ -250,7 +283,7 @@ func isDecimal(s string) bool {
 	return true
 }
 
-func estimateTodaylogRowCapacity(file *os.File) (estimate int, sampleBytes int64, sampleRows int, err error) {
+func estimateTodaylogRowCapacity(file *os.File, prefilter *regexp.Regexp) (estimate int, sampleBytes int64, sampleRows int, err error) {
 	if _, err = file.Seek(0, io.SeekStart); err != nil {
 		return 0, 0, 0, fmt.Errorf("seek %q: %w", file.Name(), err)
 	}
@@ -267,8 +300,15 @@ func estimateTodaylogRowCapacity(file *os.File) (estimate int, sampleBytes int64
 	scanner.Buffer(make([]byte, 0, 64*1024), todaylogScannerBufferMax)
 	for scanner.Scan() {
 		raw := scanner.Bytes()
+		trimmed := bytes.TrimSpace(raw)
 		sampleBytes += int64(len(raw) + 1)
-		if len(bytes.TrimSpace(raw)) == 0 {
+		if len(trimmed) == 0 {
+			if sampleBytes >= todaylogEstimateSampleBytes {
+				break
+			}
+			continue
+		}
+		if prefilter != nil && !prefilter.Match(trimmed) {
 			if sampleBytes >= todaylogEstimateSampleBytes {
 				break
 			}

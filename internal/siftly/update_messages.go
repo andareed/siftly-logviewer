@@ -23,8 +23,12 @@ func (m *Model) handleSystemMsg(msg tea.Msg) (tea.Cmd, bool) {
 		return m.handleOperationTick(msg), true
 	case saveCompleteMsg:
 		return m.handleSaveComplete(msg), true
+	case graphExportCompleteMsg:
+		return m.handleGraphExportComplete(msg), true
 	case filterCompleteMsg:
 		return m.handleFilterComplete(msg), true
+	case fullSourceReloadCompleteMsg:
+		return m.handleFullSourceReloadComplete(msg), true
 	}
 	return nil, false
 }
@@ -65,7 +69,7 @@ func (m *Model) handleWindowMsg(msg tea.Msg) (tea.Cmd, bool) {
 
 func (m *Model) openHelpDialog() {
 	logging.Infof("Opening Help dialog")
-	m.activeDialog = dialogs.NewHelpDialog(Keys.Legend(m.graphConfig.Enabled))
+	m.activeDialog = dialogs.NewHelpDialog(Keys.Legend(m.graphConfig.Enabled, m.CanReloadFullSource()))
 	m.activeDialog.Show()
 }
 

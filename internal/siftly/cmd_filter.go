@@ -116,6 +116,9 @@ func filterRequiresWholeRow(pattern string) bool {
 		return false
 	}
 
+	if filterPatternCanSpanColumns(pattern) {
+		return true
+	}
 	if strings.Contains(pattern, "\t") || strings.Contains(pattern, `\t`) {
 		return true
 	}
@@ -123,4 +126,23 @@ func filterRequiresWholeRow(pattern string) bool {
 		return true
 	}
 	return strings.HasPrefix(pattern, "^") || strings.HasSuffix(pattern, "$")
+}
+
+func filterPatternCanSpanColumns(pattern string) bool {
+	spanOperators := []string{
+		`.*`,
+		`.+`,
+		`.?`,
+		`.{`,
+		`\s`,
+		`\S`,
+		`[[:space:]]`,
+		`(?s)`,
+	}
+	for _, op := range spanOperators {
+		if strings.Contains(pattern, op) {
+			return true
+		}
+	}
+	return false
 }

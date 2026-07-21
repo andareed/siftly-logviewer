@@ -1,6 +1,8 @@
 package siftly
 
 import (
+	"time"
+
 	featuregraph "github.com/andareed/siftly-hostlog/internal/siftly/features/graph"
 	featuretimewindow "github.com/andareed/siftly-hostlog/internal/siftly/features/timewindow"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
@@ -51,4 +53,5 @@ type viewState struct {
 	debugDesiredAboveHeight int
 	rowHeights              map[int]int
 	timeWindow              featuretimewindow.UIState
+	reloadFullConfirmUntil  time.Time
 }

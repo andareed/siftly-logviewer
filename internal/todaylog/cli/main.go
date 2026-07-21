@@ -35,6 +35,7 @@ func Run() {
 				c.String("debug"),
 				c.String("filter-presets"),
 				c.String("filter-history"),
+				c.String("prefilter"),
 			)
 		},
 		Flags: []cli.Flag{
@@ -54,6 +55,10 @@ func Run() {
 			&cli.StringFlag{
 				Name:  "filter-history",
 				Usage: "Path to writable filter history JSON (default: todaylog-filter-history.json)",
+			},
+			&cli.StringFlag{
+				Name:  "prefilter",
+				Usage: "Regex applied to raw todaylog lines before parsing/loading",
 			},
 			&cli.BoolFlag{
 				Name:  "version",

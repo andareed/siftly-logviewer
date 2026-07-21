@@ -27,6 +27,13 @@ type saveCompleteMsg struct {
 	Err      error
 }
 
+type graphExportCompleteMsg struct {
+	ID       int
+	Path     string
+	Duration time.Duration
+	Err      error
+}
+
 type filterCompleteMsg struct {
 	ID              int
 	FilteredIndices []int
@@ -34,6 +41,14 @@ type filterCompleteMsg struct {
 	DoneMessage     string
 	DoneKind        string
 	Duration        time.Duration
+}
+
+type fullSourceReloadCompleteMsg struct {
+	ID             int
+	Model          *Model
+	CurrentRowHash uint64
+	Duration       time.Duration
+	Err            error
 }
 
 func (m *Model) beginOperation(label string) (int, tea.Cmd) {
@@ -103,6 +118,32 @@ func (m *Model) handleSaveComplete(msg saveCompleteMsg) tea.Cmd {
 	return m.view.notice.Start(fmt.Sprintf("Saved in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
 }
 
+func (m *Model) startGraphExportOperation(path string) tea.Cmd {
+	id, tick := m.beginOperation("Exporting graph")
+	exportCmd := func() tea.Msg {
+		start := time.Now()
+		err := ExportGraphModel(m, path)
+		return graphExportCompleteMsg{
+			ID:       id,
+			Path:     path,
+			Duration: time.Since(start),
+			Err:      err,
+		}
+	}
+	return tea.Batch(tick, exportCmd)
+}
+
+func (m *Model) handleGraphExportComplete(msg graphExportCompleteMsg) tea.Cmd {
+	if !m.finishOperation(msg.ID) {
+		return nil
+	}
+	if msg.Err != nil {
+		return m.view.notice.Start("Graph export error", "error", noticeDuration)
+	}
+	m.lastGraphExportFileName = msg.Path
+	return m.view.notice.Start(fmt.Sprintf("Graph exported in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
+}
+
 func (m *Model) startFilterOperation(doneMessage string) tea.Cmd {
 	return m.startFilterOperationWithKind(doneMessage, "success")
 }
@@ -165,6 +206,66 @@ func (m *Model) handleFilterComplete(msg filterCompleteMsg) tea.Cmd {
 	return m.view.notice.Start(
 		fmt.Sprintf("%s (%d rows, %s)", label, len(m.table.filteredIndices), msg.Duration.Round(time.Millisecond)),
 		msg.DoneKind,
+		noticeDuration,
+	)
+}
+
+func (m *Model) startFullSourceReloadOperation() tea.Cmd {
+	if m.fullSourceReload == nil {
+		return m.view.notice.Start("No prefiltered source to reload", "warn", noticeDuration)
+	}
+
+	reload := m.fullSourceReload
+	currentRowHash := m.currentRowHashID()
+	id, tick := m.beginOperation("Loading full dataset")
+	reloadCmd := func() tea.Msg {
+		start := time.Now()
+		next, err := reload()
+		return fullSourceReloadCompleteMsg{
+			ID:             id,
+			Model:          next,
+			CurrentRowHash: currentRowHash,
+			Duration:       time.Since(start),
+			Err:            err,
+		}
+	}
+	return tea.Batch(tick, reloadCmd)
+}
+
+func (m *Model) handleFullSourceReloadComplete(msg fullSourceReloadCompleteMsg) tea.Cmd {
+	if !m.finishOperation(msg.ID) {
+		return nil
+	}
+	if msg.Err != nil {
+		return m.view.notice.Start("Reload error", "error", noticeDuration)
+	}
+	if msg.Model == nil {
+		return m.view.notice.Start("Reload error", "error", noticeDuration)
+	}
+
+	previous := *m
+	next := msg.Model
+	mergeAnnotationsInto(next, &previous)
+	next.filterConfig = previous.filterConfig
+	next.fileName = previous.fileName
+	next.lastExportFileName = previous.lastExportFileName
+	next.lastGraphExportFileName = previous.lastGraphExportFileName
+	next.terminalHeight = previous.terminalHeight
+	next.terminalWidth = previous.terminalWidth
+	next.ready = previous.ready
+	if next.graphConfig.Enabled {
+		next.view.graphWindow.Open = previous.view.graphWindow.Open
+	}
+
+	*m = *next
+	m.applyFilter()
+	m.jumpToHashID(msg.CurrentRowHash)
+	m.clampCursor()
+	m.refreshView("full-source-reload", true)
+
+	return m.view.notice.Start(
+		fmt.Sprintf("Loaded full dataset (%d rows, %s)", len(m.table.rows), msg.Duration.Round(time.Millisecond)),
+		"success",
 		noticeDuration,
 	)
 }

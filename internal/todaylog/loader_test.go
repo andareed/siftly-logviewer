@@ -122,3 +122,79 @@ func TestLoadModelAutoLoadsSavedJSONSnapshot(t *testing.T) {
 		t.Fatalf("resaved snapshot should use compact row arrays, got legacy cols keys")
 	}
 }
+
+func TestLoadModelAutoWithPrefilterMatchesRawLines(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "today.log")
+	content := strings.Join([]string{
+		"0 1713878400 keep-proc 101 metric.keep.alpha 10",
+		"0 1713878401 drop-proc 102 metric.drop.beta 20",
+		"0 1713878402 keep-proc 103 metric.keep.gamma 30",
+	}, "\n") + "\n"
+	if err := os.WriteFile(logPath, []byte(content), 0o600); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+
+	m, err := LoadModelAutoWithOptions(logPath, LoadOptions{Prefilter: `metric\.keep\.`})
+	if err != nil {
+		t.Fatalf("load prefiltered log: %v", err)
+	}
+	if !m.CanReloadFullSource() {
+		t.Fatalf("prefiltered model should expose full source reload")
+	}
+
+	snapshotPath := filepath.Join(dir, "prefiltered.json")
+	if err := siftly.SaveModel(m, snapshotPath); err != nil {
+		t.Fatalf("save snapshot: %v", err)
+	}
+	rows := readSnapshotRows(t, snapshotPath)
+
+	if len(rows) != 2 {
+		t.Fatalf("row count = %d want 2", len(rows))
+	}
+	if got, want := rows[0][3], "keep-proc"; got != want {
+		t.Fatalf("first process = %q want %q", got, want)
+	}
+	if got, want := rows[0][4], "metric.keep.alpha"; got != want {
+		t.Fatalf("first key = %q want %q", got, want)
+	}
+	if got, want := rows[1][4], "metric.keep.gamma"; got != want {
+		t.Fatalf("second key = %q want %q", got, want)
+	}
+}
+
+func TestLoadModelAutoWithPrefilterRejectsInvalidRegex(t *testing.T) {
+	t.Parallel()
+
+	logPath := filepath.Join(t.TempDir(), "today.log")
+	if err := os.WriteFile(logPath, []byte("0 1713878400 proc-name 123 metric_name value\n"), 0o600); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+
+	_, err := LoadModelAutoWithOptions(logPath, LoadOptions{Prefilter: `[`})
+	if err == nil {
+		t.Fatalf("expected invalid regex error")
+	}
+	if !strings.Contains(err.Error(), "compile prefilter") {
+		t.Fatalf("error = %v, want compile prefilter context", err)
+	}
+}
+
+func readSnapshotRows(t *testing.T, path string) [][]string {
+	t.Helper()
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read snapshot: %v", err)
+	}
+
+	var snapshot struct {
+		Rows [][]string `json:"rows"`
+	}
+	if err := json.Unmarshal(data, &snapshot); err != nil {
+		t.Fatalf("unmarshal snapshot: %v", err)
+	}
+	return snapshot.Rows
+}

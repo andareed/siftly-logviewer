@@ -123,3 +123,35 @@ func TestFilterFallsBackToWholeRowMatchingWhenPatternNeedsIt(t *testing.T) {
 		t.Fatalf("matched row index = %d want 0", got)
 	}
 }
+
+func TestFilterMatchesGrepStylePatternAcrossColumns(t *testing.T) {
+	rows := []Row{
+		{Cols: []string{"2026-07-21 10:00:00", "1770834660", "49304", "fstool_va", "seq", "57004"}},
+		{Cols: []string{"2026-07-21 10:00:01", "1770834661", "49304", "fstool_va", "cpu", "0.27"}},
+		{Cols: []string{"2026-07-21 10:00:02", "1770834662", "49304", "other", "seq", "57005"}},
+	}
+	for i := range rows {
+		rows[i].ID = rows[i].ComputeID()
+		rows[i].OriginalIndex = i + 1
+	}
+
+	m := Model{
+		table: tableState{
+			rows: rows,
+		},
+	}
+
+	if err := m.setFilterPattern(`fstool_va.*seq`); err != nil {
+		t.Fatalf("set filter: %v", err)
+	}
+
+	if !m.table.filterWholeRow {
+		t.Fatalf("filter should use whole-row fallback for grep-style span pattern")
+	}
+	if got := len(m.table.filteredIndices); got != 1 {
+		t.Fatalf("filtered rows after whole-row match = %d want 1", got)
+	}
+	if got := m.table.filteredIndices[0]; got != 0 {
+		t.Fatalf("matched row index = %d want 0", got)
+	}
+}

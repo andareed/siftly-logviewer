@@ -69,7 +69,7 @@ func (m *Model) footerView(width int) string {
 
 	hints := "v view · c comment · t time · / search · ? help"
 	if m.graphConfig.Enabled {
-		hints += " · w graph"
+		hints += " · w graph · W export graph"
 	}
 
 	debugInfo := ""

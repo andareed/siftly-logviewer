@@ -36,6 +36,8 @@ type Keymap struct {
 	JumpToLineNo  key.Binding
 	TimeWindow    key.Binding
 	ToggleGraph   key.Binding
+	GraphExport   key.Binding
+	ReloadFull    key.Binding
 	ColumnViewOps key.Binding
 }
 
@@ -164,13 +166,21 @@ var Keys = Keymap{
 		key.WithKeys("w"),
 		key.WithHelp("w", "Toggle graph"),
 	),
+	GraphExport: key.NewBinding(
+		key.WithKeys("W"),
+		key.WithHelp("W", "Export graph"),
+	),
+	ReloadFull: key.NewBinding(
+		key.WithKeys("R"),
+		key.WithHelp("R", "Reload full data"),
+	),
 	ColumnViewOps: key.NewBinding(
 		key.WithKeys("v"),
 		key.WithHelp("v c|s|o|r", "Columns/Sort/View ops"),
 	),
 }
 
-func (k Keymap) Legend(graphEnabled bool) []key.Binding {
+func (k Keymap) Legend(graphEnabled bool, reloadFullEnabled bool) []key.Binding {
 	legend := []key.Binding{
 		k.Quit,
 		k.MarkMode,
@@ -199,6 +209,10 @@ func (k Keymap) Legend(graphEnabled bool) []key.Binding {
 	}
 	if graphEnabled {
 		legend = append(legend, k.ToggleGraph)
+		legend = append(legend, k.GraphExport)
+	}
+	if reloadFullEnabled {
+		legend = append(legend, k.ReloadFull)
 	}
 	return legend
 }

@@ -3,6 +3,7 @@ package siftly
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
 	"github.com/charmbracelet/bubbles/key"
@@ -40,7 +41,11 @@ const (
 	viewActionScrollRight
 	viewActionSave
 	viewActionExport
+	viewActionGraphExport
+	viewActionReloadFull
 )
+
+const fullReloadConfirmWindow = 10 * time.Second
 
 type viewPrefixAction int
 
@@ -91,7 +96,12 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, comboCmd
 	}
 
-	switch m.resolveViewAction(msg) {
+	action := m.resolveViewAction(msg)
+	if action != viewActionReloadFull {
+		m.view.reloadFullConfirmUntil = time.Time{}
+	}
+
+	switch action {
 	case viewActionPrefixView:
 		m.view.pendingViewPrefix = "v"
 		m.setPrefixHint("c: columns   s: sort   o: order   r: reset   esc: cancel")
@@ -170,6 +180,12 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.refreshView("graph-toggle", true)
 			didRefresh = true
 		}
+	case viewActionGraphExport:
+		if !m.graphConfig.Enabled {
+			cmd = m.view.notice.Start("Graph not configured", "warn", noticeDuration)
+			break
+		}
+		cmd = m.startGraphExportOperation(defaultGraphExportPath(*m))
 	case viewActionRowDown:
 		if m.cursor < len(m.table.rows)-1 {
 			m.cursor++
@@ -195,6 +211,8 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewActionExport:
 		m.openExportDialog()
 		return m, nil
+	case viewActionReloadFull:
+		return m, m.confirmOrReloadFullSource()
 	}
 
 	//TODO: DON'T THINK WE SHOULD BE RENDERING TABLE EVERY TIME TBH
@@ -242,6 +260,8 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionToggleFilter
 	case key.Matches(msg, Keys.ToggleGraph):
 		return viewActionToggleGraph
+	case key.Matches(msg, Keys.GraphExport):
+		return viewActionGraphExport
 	case key.Matches(msg, Keys.RowDown):
 		return viewActionRowDown
 	case key.Matches(msg, Keys.RowUp):
@@ -260,9 +280,26 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionSave
 	case key.Matches(msg, Keys.ExportToFile):
 		return viewActionExport
+	case key.Matches(msg, Keys.ReloadFull):
+		return viewActionReloadFull
 	default:
 		return viewActionNone
 	}
+}
+
+func (m *Model) confirmOrReloadFullSource() tea.Cmd {
+	if !m.CanReloadFullSource() {
+		return m.view.notice.Start("No prefiltered source to reload", "warn", noticeDuration)
+	}
+
+	now := time.Now()
+	if now.After(m.view.reloadFullConfirmUntil) {
+		m.view.reloadFullConfirmUntil = now.Add(fullReloadConfirmWindow)
+		return m.view.notice.Start("Press R again to load full dataset; this may take several seconds", "warn", 5*time.Second)
+	}
+
+	m.view.reloadFullConfirmUntil = time.Time{}
+	return m.startFullSourceReloadOperation()
 }
 
 func (m *Model) handleViewPrefixKey(msg tea.KeyMsg) (handled bool, cmd tea.Cmd, refresh bool) {
