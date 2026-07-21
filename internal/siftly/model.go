@@ -1,6 +1,8 @@
 package siftly
 
 import (
+	"time"
+
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
 	"github.com/andareed/siftly-hostlog/internal/siftly/features/dialogs"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
@@ -38,6 +40,7 @@ type Model struct {
 	lastExportFileName      string
 	lastGraphExportFileName string
 	dirty                   bool
+	changes                 changeTracker
 	view                    viewState
 	table                   tableState
 	styles                  ui.Styles
@@ -79,12 +82,17 @@ func (m *Model) InitialiseView() {
 	if m.table.timeWindow.Enabled {
 		m.applyFilter()
 	}
+	m.initializeChangeTracking()
+	m.restoreRecoverySnapshot()
 }
 
 func (m *Model) Init() tea.Cmd {
 	defer logging.TimeOperation("initial filter")()
 	m.applyFilter()
 	logging.Info("siftly-hostlog: Initialised")
+	if m.changes.recoveredOnStart {
+		return m.view.notice.Start("Recovered unsaved changes", "warn", 5*time.Second)
+	}
 	return nil
 }
 
@@ -99,22 +107,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	logging.Debugf("model:Update called with msg: %#T: %#v", msg, msg)
 
 	if cmd, handled := m.handleSystemMsg(msg); handled {
-		return m, cmd
+		return m.finishUpdate(m, cmd)
 	}
 	if m.view.operation.active {
-		return m, nil
+		return m.finishUpdate(m, nil)
 	}
 	if cmd, handled := m.handleDialogInput(msg); handled {
-		return m, cmd
+		return m.finishUpdate(m, cmd)
 	}
 	if cmd, handled := m.handleWindowMsg(msg); handled {
-		return m, cmd
+		return m.finishUpdate(m, cmd)
 	}
 	if keyMsg, ok := msg.(tea.KeyMsg); ok {
-		return m.handleKeyMsg(keyMsg)
+		next, cmd := m.handleKeyMsg(keyMsg)
+		return m.finishUpdate(next, cmd)
 	}
 	if next, cmd, handled := m.handleCommandInputMsg(msg); handled {
-		return next, cmd
+		return m.finishUpdate(next, cmd)
 	}
-	return m, nil
+	return m.finishUpdate(m, nil)
+}
+
+func (m *Model) finishUpdate(next tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	return next, batchCmd(cmd, m.takePendingRecoveryCmd())
 }

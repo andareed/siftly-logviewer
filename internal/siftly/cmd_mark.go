@@ -55,7 +55,7 @@ func (m *Model) markDisplayRange(colour ui.MarkColor, startCursor, endCursor int
 		changed++
 	}
 	if dirty {
-		m.markDirty()
+		m.recordChange("mark rows")
 	}
 	return changed
 }

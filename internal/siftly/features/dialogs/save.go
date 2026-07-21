@@ -84,7 +84,7 @@ func (d Save) View() string {
 		dialogStatusLine(d.state.StatusKind, d.state.StatusMessage),
 		renderDialogActionRowWithKeys(innerWidth, "Enter", d.state.PrimaryAction, d.state.PrimaryEnabled, "Esc", "Cancel"),
 	}
-	return renderDialogPanel("Save As", dialogTopRightState(d.state.TopRightState), 78, contentLines)
+	return renderDialogPanel("Save Siftly JSON", dialogTopRightState(d.state.TopRightState), 78, contentLines)
 }
 
 func (d *Save) Show() {

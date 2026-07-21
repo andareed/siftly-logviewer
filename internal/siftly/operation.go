@@ -21,10 +21,11 @@ type operationTickMsg struct {
 }
 
 type saveCompleteMsg struct {
-	ID       int
-	Path     string
-	Duration time.Duration
-	Err      error
+	ID           int
+	Path         string
+	RecoveryPath string
+	Duration     time.Duration
+	Err          error
 }
 
 type graphExportCompleteMsg struct {
@@ -93,15 +94,17 @@ func operationNotice(label string, elapsed time.Duration) string {
 }
 
 func (m *Model) startSaveOperation(path string) tea.Cmd {
-	id, tick := m.beginOperation("Saving")
+	id, tick := m.beginOperation("Saving Siftly JSON")
+	recoveryPath, _ := m.recoveryFilePath()
 	saveCmd := func() tea.Msg {
 		start := time.Now()
 		err := SaveModel(m, path)
 		return saveCompleteMsg{
-			ID:       id,
-			Path:     path,
-			Duration: time.Since(start),
-			Err:      err,
+			ID:           id,
+			Path:         path,
+			RecoveryPath: recoveryPath,
+			Duration:     time.Since(start),
+			Err:          err,
 		}
 	}
 	return tea.Batch(tick, saveCmd)
@@ -115,12 +118,18 @@ func (m *Model) handleSaveComplete(msg saveCompleteMsg) tea.Cmd {
 		return m.view.notice.Start("Save error", "error", noticeDuration)
 	}
 	m.fileName = msg.Path
-	m.dirty = false
-	return m.view.notice.Start(fmt.Sprintf("Saved in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
+	m.markSavedBaseline()
+	if msg.RecoveryPath != "" {
+		_ = removeRecoveryFile(msg.RecoveryPath)
+	}
+	if recoveryPath, err := m.recoveryFilePath(); err == nil {
+		_ = removeRecoveryFile(recoveryPath)
+	}
+	return m.view.notice.Start(fmt.Sprintf("Siftly JSON saved in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
 }
 
 func (m *Model) startGraphExportOperation(path string) tea.Cmd {
-	id, tick := m.beginOperation("Exporting graph")
+	id, tick := m.beginOperation("Exporting graph SVG")
 	exportCmd := func() tea.Msg {
 		start := time.Now()
 		err := ExportGraphModel(m, path)
@@ -142,7 +151,7 @@ func (m *Model) handleGraphExportComplete(msg graphExportCompleteMsg) tea.Cmd {
 		return m.view.notice.Start("Graph export error", "error", noticeDuration)
 	}
 	m.lastGraphExportFileName = msg.Path
-	return m.view.notice.Start(fmt.Sprintf("Graph exported in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
+	return m.view.notice.Start(fmt.Sprintf("Graph SVG exported in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
 }
 
 func (m *Model) startFilterOperation(doneMessage string) tea.Cmd {
@@ -256,6 +265,7 @@ func (m *Model) handleFullSourceReloadComplete(msg fullSourceReloadCompleteMsg) 
 	next.lastExportFileName = previous.lastExportFileName
 	next.lastGraphExportFileName = previous.lastGraphExportFileName
 	next.dirty = previous.dirty
+	next.changes = previous.changes
 	next.terminalHeight = previous.terminalHeight
 	next.terminalWidth = previous.terminalWidth
 	next.ready = previous.ready

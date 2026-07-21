@@ -41,7 +41,7 @@ func (m *Model) handleTimeWindowSetCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 		m.table.timeWindow.Start = m.table.timeMin
 		m.table.timeWindow.End = m.table.timeMax
 		if previous != m.table.timeWindow {
-			m.markDirty()
+			m.recordChange("time window")
 		}
 		m.view.timeWindow.DraftStart = m.table.timeWindow.Start
 		m.view.timeWindow.DraftEnd = m.table.timeWindow.End

@@ -43,6 +43,9 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 		}
 		return m.commandHintsLine(command)
 	}
+	if m.quitConfirmationActive() {
+		return "s: save   q: quit without saving   esc: cancel"
+	}
 
 	if prefix := strings.TrimSpace(m.view.pendingViewPrefix); prefix != "" {
 		switch prefix {
@@ -52,6 +55,11 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 			return "e: edit comment   v: toggle drawer   esc: cancel"
 		case "t":
 			return "w: window   b: set start   e: set end   r: reset   esc: cancel"
+		case "e":
+			if m.graphConfig.Enabled {
+				return "d: filtered data   g: graph SVG   esc: cancel"
+			}
+			return "d: filtered data   esc: cancel"
 		}
 	}
 	if m.view.inspector.open {
@@ -61,13 +69,9 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 		return "j/k: extend   ctrl+c: copy   m: mark   space/esc: clear   ?: help"
 	}
 
-	hints := "j/k: navigate   f: filter   /: search   space: select   v/c/t: actions   ?: help"
+	hints := "j/k: navigate   p: commands   ?: help   f: filter   /: search   space: select   s/e: output   u/r: undo/redo"
 	if m.graphConfig.Enabled {
 		hints += "   w: graph"
 	}
 	return hints
-}
-
-func (m *Model) markDirty() {
-	m.dirty = true
 }

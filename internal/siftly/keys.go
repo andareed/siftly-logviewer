@@ -11,26 +11,25 @@ type Keymap struct {
 	NextMark            key.Binding
 	PrevMark            key.Binding
 	Filter              key.Binding
-	Sort                key.Binding
 	Search              key.Binding
 	ToggleFilter        key.Binding
 	SearchNext          key.Binding
 	SearchPrev          key.Binding
-	TimeWindowSet       key.Binding
-	ShowComment         key.Binding
-	EditComment         key.Binding
 	CommentOps          key.Binding
 	TimeOps             key.Binding
 	PageUp              key.Binding
 	PageDown            key.Binding
 	RowDown             key.Binding
 	RowUp               key.Binding
+	CommandPalette      key.Binding
 	OpenHelp            key.Binding
 	ScrollLeft          key.Binding
 	ScrollRight         key.Binding
 	SaveToFile          key.Binding
-	ExportToFile        key.Binding
+	ExportOps           key.Binding
 	CopyRow             key.Binding
+	Undo                key.Binding
+	Redo                key.Binding
 	ToggleInspector     key.Binding
 	InspectorNextField  key.Binding
 	InspectorPrevField  key.Binding
@@ -42,9 +41,7 @@ type Keymap struct {
 	JumpToStart         key.Binding
 	JumpToEnd           key.Binding
 	JumpToLineNo        key.Binding
-	TimeWindow          key.Binding
 	ToggleGraph         key.Binding
-	GraphExport         key.Binding
 	ReloadFull          key.Binding
 	ColumnViewOps       key.Binding
 }
@@ -70,14 +67,6 @@ var Keys = Keymap{
 		key.WithKeys("[", "ctrl+p"),
 		key.WithHelp("[/ctrl+p", "Jump to previous mark"),
 	),
-	ShowComment: key.NewBinding(
-		key.WithKeys("V"),
-		key.WithHelp("V", "View comments"),
-	),
-	EditComment: key.NewBinding(
-		key.WithKeys("c"),
-		key.WithHelp("c", "Edit comment on selected row"),
-	),
 	CommentOps: key.NewBinding(
 		key.WithKeys("c"),
 		key.WithHelp("c e|v", "Comments ops"),
@@ -85,10 +74,6 @@ var Keys = Keymap{
 	Filter: key.NewBinding(
 		key.WithKeys("f"),
 		key.WithHelp("f", "Filter by Regex"),
-	),
-	Sort: key.NewBinding(
-		key.WithKeys("S"),
-		key.WithHelp("S", "Sort rows"),
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),
@@ -107,12 +92,12 @@ var Keys = Keymap{
 		key.WithHelp("N", "Prev search"),
 	),
 	PageUp: key.NewBinding(
-		key.WithKeys("u", "pgup"),
-		key.WithHelp("u/pgup", "page up"),
+		key.WithKeys("ctrl+u", "pgup"),
+		key.WithHelp("ctrl+u/pgup", "Page up"),
 	),
 	PageDown: key.NewBinding(
-		key.WithKeys("d", "pgdown"),
-		key.WithHelp("d/pgdown", "Page down"),
+		key.WithKeys("ctrl+d", "pgdown"),
+		key.WithHelp("ctrl+d/pgdown", "Page down"),
 	),
 	RowDown: key.NewBinding(
 		key.WithKeys("j", "down"),
@@ -121,6 +106,10 @@ var Keys = Keymap{
 	RowUp: key.NewBinding(
 		key.WithKeys("k", "up"),
 		key.WithHelp("k/↑", "Move a row up"),
+	),
+	CommandPalette: key.NewBinding(
+		key.WithKeys("p"),
+		key.WithHelp("p", "Command palette"),
 	),
 	OpenHelp: key.NewBinding(
 		key.WithKeys("?"),
@@ -136,15 +125,23 @@ var Keys = Keymap{
 	),
 	SaveToFile: key.NewBinding(
 		key.WithKeys("s"),
-		key.WithHelp("s", "Save to filename"),
+		key.WithHelp("s", "Save Siftly JSON"),
 	),
-	ExportToFile: key.NewBinding(
+	ExportOps: key.NewBinding(
 		key.WithKeys("e"),
-		key.WithHelp("e", "Export to filename"),
+		key.WithHelp("e d", "Export filtered data"),
 	),
 	CopyRow: key.NewBinding(
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "Copy row/selection"),
+	),
+	Undo: key.NewBinding(
+		key.WithKeys("u"),
+		key.WithHelp("u", "Undo last change"),
+	),
+	Redo: key.NewBinding(
+		key.WithKeys("r"),
+		key.WithHelp("r", "Redo last change"),
 	),
 	ToggleInspector: key.NewBinding(
 		key.WithKeys("enter"),
@@ -190,77 +187,20 @@ var Keys = Keymap{
 		key.WithKeys(":"),
 		key.WithHelp(":", "Jump To line number"),
 	),
-	TimeWindow: key.NewBinding(
-		key.WithKeys("t"),
-		key.WithHelp("t", "Time window"),
-	),
 	TimeOps: key.NewBinding(
 		key.WithKeys("t"),
 		key.WithHelp("t b|e|r|w", "Time ops"),
-	),
-	TimeWindowSet: key.NewBinding(
-		key.WithKeys("T"),
-		key.WithHelp("T", "Set time window from cursor"),
 	),
 	ToggleGraph: key.NewBinding(
 		key.WithKeys("w"),
 		key.WithHelp("w", "Toggle graph"),
 	),
-	GraphExport: key.NewBinding(
-		key.WithKeys("W"),
-		key.WithHelp("W", "Export graph"),
-	),
 	ReloadFull: key.NewBinding(
-		key.WithKeys("R"),
-		key.WithHelp("R", "Reload full data"),
+		key.WithKeys("ctrl+r"),
+		key.WithHelp("ctrl+r", "Reload full data"),
 	),
 	ColumnViewOps: key.NewBinding(
 		key.WithKeys("v"),
 		key.WithHelp("v c|s|o|r", "Columns/Sort/View ops"),
 	),
-}
-
-func (k Keymap) Legend(graphEnabled bool, reloadFullEnabled bool) []key.Binding {
-	legend := []key.Binding{
-		k.Quit,
-		k.MarkMode,
-		k.ShowMarksOnly,
-		k.NextMark,
-		k.PrevMark,
-		k.Filter,
-		k.Search,
-		k.ToggleFilter,
-		k.SearchNext,
-		k.SearchPrev,
-		k.TimeOps,
-		k.CommentOps,
-		k.PageUp,
-		k.PageDown,
-		k.CopyRow,
-		k.ToggleInspector,
-		k.InspectorNextField,
-		k.InspectorPrevField,
-		k.InspectorCopyField,
-		k.InspectorScrollDown,
-		k.InspectorScrollUp,
-		k.SelectRange,
-		k.ClearRange,
-		k.ExportToFile,
-		k.SaveToFile,
-		k.RowUp,
-		k.RowDown,
-		k.JumpToStart,
-		k.JumpToEnd,
-		k.JumpToLineNo,
-		k.TimeWindow,
-		k.ColumnViewOps,
-	}
-	if graphEnabled {
-		legend = append(legend, k.ToggleGraph)
-		legend = append(legend, k.GraphExport)
-	}
-	if reloadFullEnabled {
-		legend = append(legend, k.ReloadFull)
-	}
-	return legend
 }

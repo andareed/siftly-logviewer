@@ -192,21 +192,13 @@ func ExportModel(m *Model, path string) error {
 
 // SaveModel writes the entire model to a JSON file.
 func SaveModel(m *Model, path string) error {
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-
-	w := bufio.NewWriterSize(f, 1<<20)
-	if err := writeCompactSnapshot(w, m); err != nil {
-		_ = f.Close()
-		return err
-	}
-	if err := w.Flush(); err != nil {
-		_ = f.Close()
-		return err
-	}
-	return f.Close()
+	return writeAtomicFile(path, 0o600, func(w io.Writer) error {
+		buffer := bufio.NewWriterSize(w, 1<<20)
+		if err := writeCompactSnapshot(buffer, m); err != nil {
+			return err
+		}
+		return buffer.Flush()
+	})
 }
 
 // LoadModel replaces the contents of m with the snapshot from path.

@@ -13,12 +13,26 @@ const (
 	ActionExportCancel
 	ActionFilterApply
 	ActionFilterCancel
+	ActionCommandRun
+	ActionCommandCancel
 )
 
 type Action struct {
-	Kind    ActionKind
-	Path    string
-	Pattern string
+	Kind      ActionKind
+	Path      string
+	Pattern   string
+	CommandID string
+}
+
+type CommandItem struct {
+	ID             string
+	Category       string
+	Title          string
+	Shortcut       string
+	Description    string
+	Keywords       string
+	Enabled        bool
+	DisabledReason string
 }
 
 // Dialog is the common interface all dialogs (Save, Export, Help, etc.) implement.

@@ -29,6 +29,7 @@ func (m *Model) prepareFilterPattern(pattern string) error {
 		m.table.filterRegex = re
 		m.table.filterWholeRow = filterRequiresWholeRow(pattern)
 	}
+	m.recordChange("filter")
 	return nil
 }
 
@@ -57,6 +58,7 @@ func (m *Model) toggleFilterState() bool {
 		return false
 	}
 	m.table.filterEnabled = !m.table.filterEnabled
+	m.recordChange("filter")
 	return true
 }
 

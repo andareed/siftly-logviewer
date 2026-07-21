@@ -113,6 +113,9 @@ func (m *Model) footerView(width int) string {
 	if m.view.mode == modeView && m.view.inspector.open {
 		modeBanner = "INSPECT"
 	}
+	if m.view.mode == modeView && m.quitConfirmationActive() {
+		modeBanner = "QUIT?"
+	}
 	if m.view.mode == modeView && m.view.pendingViewPrefix != "" {
 		switch m.view.pendingViewPrefix {
 		case "v":

@@ -73,7 +73,7 @@ func runColumnsCommand(m *Model, raw string) tea.Cmd {
 			m.table.header[i].Visible = true
 		}
 		if changed {
-			m.markDirty()
+			m.recordChange("column visibility")
 		}
 		m.refreshView("show-all-columns", true)
 		return m.view.notice.Start("All columns shown", "", noticeDuration)
@@ -84,7 +84,7 @@ func runColumnsCommand(m *Model, raw string) tea.Cmd {
 		return m.view.notice.Start(err.Error(), "warn", noticeDuration)
 	}
 	if len(toggled) > 0 {
-		m.markDirty()
+		m.recordChange("column visibility")
 	}
 	return m.view.notice.Start(columnsNoticeText(toggled, missing), "", noticeDuration)
 }
@@ -101,7 +101,7 @@ func runColumnOrderCommand(m *Model, raw string) tea.Cmd {
 	if len(ordered) == 0 {
 		return m.view.notice.Start("No columns reordered", "warn", noticeDuration)
 	}
-	m.markDirty()
+	m.recordChange("column order")
 	if len(missing) > 0 {
 		return m.view.notice.Start("Reordered columns; missing: "+strings.Join(missing, ", "), "warn", noticeDuration)
 	}

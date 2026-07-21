@@ -61,6 +61,12 @@ func TestSaveAndExportViewsDoNotContainLegacyInstructionHints(t *testing.T) {
 
 	saveView := save.View()
 	exportView := export.View()
+	if !strings.Contains(saveView, "Save Siftly JSON") {
+		t.Fatalf("save dialog does not identify Siftly JSON output: %q", saveView)
+	}
+	if !strings.Contains(exportView, "Export Filtered Data") {
+		t.Fatalf("export dialog does not identify filtered data output: %q", exportView)
+	}
 
 	for _, v := range []string{saveView, exportView} {
 		if strings.Contains(v, "enter to save") || strings.Contains(v, "enter: save") {

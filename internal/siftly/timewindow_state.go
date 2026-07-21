@@ -105,7 +105,7 @@ func (m *Model) setTimeWindowEdge(ts time.Time, setStart bool) {
 		setStart,
 	)
 	if previous != m.table.timeWindow {
-		m.markDirty()
+		m.recordChange("time window")
 	}
 	m.view.timeWindow.DraftStart = m.table.timeWindow.Start
 	m.view.timeWindow.DraftEnd = m.table.timeWindow.End

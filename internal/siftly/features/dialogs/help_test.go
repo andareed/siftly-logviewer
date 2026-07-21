@@ -3,14 +3,16 @@ package dialogs
 import (
 	"strings"
 	"testing"
-
-	"github.com/charmbracelet/bubbles/key"
 )
 
 func TestHelpViewUsesActionRowInsteadOfInstructionFooter(t *testing.T) {
-	d := NewHelpDialog([]key.Binding{
-		key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "quit")),
-	})
+	d := NewHelpDialog([]CommandItem{{
+		ID:       "general.quit",
+		Category: "General",
+		Title:    "Quit",
+		Shortcut: "q",
+		Enabled:  true,
+	}}, 100, 30)
 
 	v := d.View()
 	if strings.Contains(v, "enter/esc to return") || strings.Contains(v, "esc: close") {
@@ -18,5 +20,8 @@ func TestHelpViewUsesActionRowInsteadOfInstructionFooter(t *testing.T) {
 	}
 	if !strings.Contains(v, "[ Esc Close ]") {
 		t.Fatalf("help dialog missing action row: %q", v)
+	}
+	if !strings.Contains(v, "GENERAL") || !strings.Contains(v, "Quit") {
+		t.Fatalf("help dialog is not categorized: %q", v)
 	}
 }

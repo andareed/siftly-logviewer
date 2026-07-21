@@ -16,7 +16,7 @@ func (m *Model) addComment(comment string) {
 	if comment == "" {
 		delete(m.table.commentRows, hashId)
 		if previous != "" {
-			m.markDirty()
+			m.recordChange("edit comment")
 		}
 		logging.Infof("Clear comment Index[%d] on HashID[%d]", idx, hashId)
 		return
@@ -24,7 +24,7 @@ func (m *Model) addComment(comment string) {
 	}
 	m.table.commentRows[hashId] = comment
 	if previous != comment {
-		m.markDirty()
+		m.recordChange("edit comment")
 	}
 	logging.Infof("Setting Comment[%s] to Index[%d] on HashID[%d]", comment, idx, hashId)
 }

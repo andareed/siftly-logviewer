@@ -149,7 +149,7 @@ func (m *Model) resetTimeWindowDraft() {
 		wasEnabled := m.table.timeWindow.Enabled
 		m.table.timeWindow.Enabled = false
 		if wasEnabled {
-			m.markDirty()
+			m.recordChange("time window")
 		}
 		m.applyFilter()
 	}
@@ -187,7 +187,7 @@ func (m *Model) applyTimeWindowFromInputs() {
 	previous := m.table.timeWindow
 	m.table.timeWindow = nextWindow
 	if previous != nextWindow {
-		m.markDirty()
+		m.recordChange("time window")
 	}
 	tw.DraftStart = nextWindow.Start
 	tw.DraftEnd = nextWindow.End

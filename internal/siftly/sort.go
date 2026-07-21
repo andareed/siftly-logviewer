@@ -36,6 +36,7 @@ func (m *Model) setSortSpec(input string) error {
 
 	m.rebuildRowOrder()
 	m.applyFilter()
+	m.recordChange("sort")
 	return nil
 }
 

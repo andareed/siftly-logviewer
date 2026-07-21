@@ -31,6 +31,10 @@ func (m *Model) handleSystemMsg(msg tea.Msg) (tea.Cmd, bool) {
 		return m.handleFilterComplete(msg), true
 	case fullSourceReloadCompleteMsg:
 		return m.handleFullSourceReloadComplete(msg), true
+	case recoveryFlushMsg:
+		return m.handleRecoveryFlush(msg), true
+	case recoveryWriteCompleteMsg:
+		return m.handleRecoveryWriteComplete(msg), true
 	}
 	return nil, false
 }
@@ -49,6 +53,7 @@ func (m *Model) handleDialogInput(msg tea.Msg) (tea.Cmd, bool) {
 	var dialogCmd tea.Cmd
 	var action dialogs.Action
 	m.activeDialog, action, dialogCmd = m.activeDialog.Update(msg)
+	logging.Debugf("DIALOG ACTION: kind=%d command=%q", action.Kind, action.CommandID)
 	actionCmd := m.applyDialogAction(action)
 	return batchCmd(dialogCmd, actionCmd), true
 }
@@ -71,8 +76,21 @@ func (m *Model) handleWindowMsg(msg tea.Msg) (tea.Cmd, bool) {
 
 func (m *Model) openHelpDialog() {
 	logging.Infof("Opening Help dialog")
-	m.activeDialog = dialogs.NewHelpDialog(Keys.Legend(m.graphConfig.Enabled, m.CanReloadFullSource()))
+	m.activeDialog = dialogs.NewHelpDialog(m.commandItems(), m.terminalWidth, m.terminalHeight)
 	m.activeDialog.Show()
+}
+
+func (m *Model) openCommandPalette() tea.Cmd {
+	logging.Infof("Opening command palette")
+	m.activeDialog = dialogs.NewCommandPalette(
+		m.commandItems(),
+		m.terminalWidth,
+		m.terminalHeight,
+		m.styles.RowSelectedFG,
+		m.styles.RowSelectedBG,
+	)
+	m.activeDialog.Show()
+	return m.activeDialog.Init()
 }
 
 func (m *Model) openSaveDialog() {
@@ -82,7 +100,7 @@ func (m *Model) openSaveDialog() {
 }
 
 func (m *Model) openExportDialog() {
-	logging.Infof("Opening Export dialog")
+	logging.Infof("Opening filtered data export dialog")
 	m.activeDialog = dialogs.NewExportDialog(defaultExportName(*m), defaultDialogDir(*m))
 	m.activeDialog.Show()
 }
@@ -109,10 +127,10 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 	case dialogs.ActionExportConfirm:
 		m.hideActiveDialog()
 		if err := ExportModel(m, action.Path); err != nil {
-			return m.view.notice.Start("Export Error", "", noticeDuration)
+			return m.view.notice.Start("Filtered data export error", "error", noticeDuration)
 		}
 		m.lastExportFileName = action.Path
-		return m.view.notice.Start("Exported succeeded", "", noticeDuration)
+		return m.view.notice.Start("Filtered data exported", "success", noticeDuration)
 	case dialogs.ActionExportCancel:
 		m.hideActiveDialog()
 		return nil
@@ -123,6 +141,12 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 		m.captureMainBodySnapshot(m.panelWidth())
 		return nil
 	case dialogs.ActionFilterCancel:
+		m.hideActiveDialog()
+		return nil
+	case dialogs.ActionCommandRun:
+		m.hideActiveDialog()
+		return m.runPaletteCommand(action.CommandID)
+	case dialogs.ActionCommandCancel:
 		m.hideActiveDialog()
 		return nil
 	default:

@@ -17,11 +17,15 @@ const (
 	viewActionPrefixView
 	viewActionPrefixComment
 	viewActionPrefixTime
+	viewActionPrefixExport
 	viewActionJump
 	viewActionFilter
 	viewActionSearch
 	viewActionMarkMode
 	viewActionQuit
+	viewActionCancelQuit
+	viewActionUndo
+	viewActionRedo
 	viewActionCopyRow
 	viewActionToggleInspector
 	viewActionInspectorNextField
@@ -44,16 +48,18 @@ const (
 	viewActionRowUp
 	viewActionPageUp
 	viewActionPageDown
+	viewActionOpenPalette
 	viewActionOpenHelp
 	viewActionScrollLeft
 	viewActionScrollRight
 	viewActionSave
-	viewActionExport
-	viewActionGraphExport
 	viewActionReloadFull
 )
 
-const fullReloadConfirmWindow = 10 * time.Second
+const (
+	fullReloadConfirmWindow = 10 * time.Second
+	quitConfirmWindow       = 10 * time.Second
+)
 
 type viewPrefixAction int
 
@@ -69,6 +75,8 @@ const (
 	viewPrefixActionTimeSetStart
 	viewPrefixActionTimeSetEnd
 	viewPrefixActionTimeReset
+	viewPrefixActionExportData
+	viewPrefixActionExportGraph
 	viewPrefixActionCancel
 )
 
@@ -105,6 +113,9 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	action := m.resolveViewAction(msg)
+	if action != viewActionQuit && action != viewActionCancelQuit {
+		m.view.quitConfirmUntil = time.Time{}
+	}
 	if action != viewActionReloadFull {
 		m.view.reloadFullConfirmUntil = time.Time{}
 	}
@@ -125,6 +136,14 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setPrefixHint("w: window   b: set start   e: set end   r: reset   esc: cancel")
 		cmd = nil
 		return m, cmd
+	case viewActionPrefixExport:
+		m.view.pendingViewPrefix = "e"
+		if m.graphConfig.Enabled {
+			m.setPrefixHint("d: filtered data   g: graph SVG   esc: cancel")
+		} else {
+			m.setPrefixHint("d: filtered data   esc: cancel")
+		}
+		return m, nil
 	// Migrating to a command / input method
 	case viewActionJump:
 		logging.Infof("Enabling Command: Jumping to specific line number if it exists")
@@ -140,7 +159,16 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		cmd = m.enterCommand(CmdMark, "", true, false)
 	//TODO: Implement Serach
 	case viewActionQuit:
-		return m, tea.Quit
+		return m, m.confirmOrQuit()
+	case viewActionCancelQuit:
+		m.view.quitConfirmUntil = time.Time{}
+		cmd = m.view.notice.Start("Quit cancelled", "", noticeDuration)
+	case viewActionUndo:
+		cmd = m.undoLastChange()
+		didRefresh = true
+	case viewActionRedo:
+		cmd = m.redoLastChange()
+		didRefresh = true
 	case viewActionCopyRow:
 		logging.Infof("Key combination for copying rows to the clipboard")
 		cmd = m.copyRowsToClipboard()
@@ -178,6 +206,7 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Show Marks only
 		logging.Infof("Toggle for Show Marks Only has been pressed")
 		m.table.showOnlyMarked = !m.table.showOnlyMarked
+		m.recordChange("marks-only view")
 		cmd = m.startFilterOperation(fmt.Sprintf("Show only marked: %t", m.table.showOnlyMarked))
 	case viewActionNextMark:
 		// Next mark jump
@@ -211,15 +240,10 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewActionToggleGraph:
 		if m.graphConfig.Enabled {
 			m.view.graphWindow.Open = !m.view.graphWindow.Open
+			m.recordChange("graph view")
 			m.refreshView("graph-toggle", true)
 			didRefresh = true
 		}
-	case viewActionGraphExport:
-		if !m.graphConfig.Enabled {
-			cmd = m.view.notice.Start("Graph not configured", "warn", noticeDuration)
-			break
-		}
-		cmd = m.startGraphExportOperation(defaultGraphExportPath(*m))
 	case viewActionRowDown:
 		if m.cursor < len(m.table.filteredIndices)-1 {
 			m.cursor++
@@ -232,6 +256,8 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pageUp()
 	case viewActionPageDown:
 		m.pageDown()
+	case viewActionOpenPalette:
+		return m, m.openCommandPalette()
 	case viewActionOpenHelp:
 		m.openHelpDialog()
 		return m, nil
@@ -241,9 +267,6 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.viewport.ScrollRight(4)
 	case viewActionSave:
 		m.openSaveDialog()
-		return m, nil
-	case viewActionExport:
-		m.openExportDialog()
 		return m, nil
 	case viewActionReloadFull:
 		return m, m.confirmOrReloadFullSource()
@@ -264,6 +287,8 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionPrefixComment
 	case key.Matches(msg, Keys.TimeOps):
 		return viewActionPrefixTime
+	case key.Matches(msg, Keys.ExportOps):
+		return viewActionPrefixExport
 	case key.Matches(msg, Keys.JumpToLineNo):
 		return viewActionJump
 	case key.Matches(msg, Keys.Filter):
@@ -274,6 +299,12 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionMarkMode
 	case key.Matches(msg, Keys.Quit):
 		return viewActionQuit
+	case m.quitConfirmationActive() && key.Matches(msg, Keys.ClearRange):
+		return viewActionCancelQuit
+	case key.Matches(msg, Keys.Undo):
+		return viewActionUndo
+	case key.Matches(msg, Keys.Redo):
+		return viewActionRedo
 	case key.Matches(msg, Keys.CopyRow):
 		return viewActionCopyRow
 	case key.Matches(msg, Keys.ToggleInspector):
@@ -310,8 +341,6 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionToggleFilter
 	case key.Matches(msg, Keys.ToggleGraph):
 		return viewActionToggleGraph
-	case key.Matches(msg, Keys.GraphExport):
-		return viewActionGraphExport
 	case key.Matches(msg, Keys.RowDown):
 		return viewActionRowDown
 	case key.Matches(msg, Keys.RowUp):
@@ -320,6 +349,8 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionPageUp
 	case key.Matches(msg, Keys.PageDown):
 		return viewActionPageDown
+	case key.Matches(msg, Keys.CommandPalette):
+		return viewActionOpenPalette
 	case key.Matches(msg, Keys.OpenHelp):
 		return viewActionOpenHelp
 	case key.Matches(msg, Keys.ScrollLeft):
@@ -328,13 +359,33 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionScrollRight
 	case key.Matches(msg, Keys.SaveToFile):
 		return viewActionSave
-	case key.Matches(msg, Keys.ExportToFile):
-		return viewActionExport
 	case key.Matches(msg, Keys.ReloadFull):
 		return viewActionReloadFull
 	default:
 		return viewActionNone
 	}
+}
+
+func (m *Model) confirmOrQuit() tea.Cmd {
+	if !m.dirty {
+		if err := m.removeRecoverySnapshotNow(); err != nil {
+			logging.Errorf("remove clean recovery snapshot before quit: %v", err)
+		}
+		return tea.Quit
+	}
+	now := time.Now()
+	if now.After(m.view.quitConfirmUntil) {
+		m.view.quitConfirmUntil = now.Add(quitConfirmWindow)
+		return m.view.notice.Start("Unsaved changes: s save, q quit without saving, esc cancel", "warn", quitConfirmWindow)
+	}
+	if err := m.writeRecoverySnapshotNow(); err != nil {
+		logging.Errorf("final recovery snapshot before quit: %v", err)
+	}
+	return tea.Quit
+}
+
+func (m *Model) quitConfirmationActive() bool {
+	return !m.view.quitConfirmUntil.IsZero() && time.Now().Before(m.view.quitConfirmUntil)
 }
 
 func (m *Model) confirmOrReloadFullSource() tea.Cmd {
@@ -389,6 +440,14 @@ func (m *Model) handleViewPrefixKey(msg tea.KeyMsg) (handled bool, cmd tea.Cmd, 
 		return true, m.quickSetTimeWindowEdge(false), true
 	case viewPrefixActionTimeReset:
 		return true, m.quickResetTimeWindow(), true
+	case viewPrefixActionExportData:
+		m.openExportDialog()
+		return true, nil, false
+	case viewPrefixActionExportGraph:
+		if !m.graphConfig.Enabled {
+			return true, m.view.notice.Start("Graph export is not available", "warn", noticeDuration), false
+		}
+		return true, m.startGraphExportOperation(defaultGraphExportPath(*m)), false
 	case viewPrefixActionCancel:
 		return true, nil, false
 	}
@@ -420,6 +479,10 @@ func (m *Model) resolveViewPrefixAction(msg tea.KeyMsg) viewPrefixAction {
 		return viewPrefixActionTimeSetEnd
 	case m.view.pendingViewPrefix == "t" && keyStr == "r":
 		return viewPrefixActionTimeReset
+	case m.view.pendingViewPrefix == "e" && keyStr == "d":
+		return viewPrefixActionExportData
+	case m.view.pendingViewPrefix == "e" && keyStr == "g":
+		return viewPrefixActionExportGraph
 	default:
 		return viewPrefixActionNone
 	}
@@ -450,7 +513,7 @@ func (m *Model) quickResetTimeWindow() tea.Cmd {
 	m.table.timeWindow.Start = m.table.timeMin
 	m.table.timeWindow.End = m.table.timeMax
 	if previous != m.table.timeWindow {
-		m.markDirty()
+		m.recordChange("time window")
 	}
 	m.view.timeWindow.DraftStart = m.table.timeWindow.Start
 	m.view.timeWindow.DraftEnd = m.table.timeWindow.End

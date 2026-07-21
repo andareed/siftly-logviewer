@@ -82,7 +82,7 @@ func (d Export) View() string {
 		dialogStatusLine(d.state.StatusKind, d.state.StatusMessage),
 		renderDialogActionRowWithKeys(innerWidth, "Enter", d.state.PrimaryAction, d.state.PrimaryEnabled, "Esc", "Cancel"),
 	}
-	return renderDialogPanel("Export", dialogTopRightState(d.state.TopRightState), 78, contentLines)
+	return renderDialogPanel("Export Filtered Data", dialogTopRightState(d.state.TopRightState), 78, contentLines)
 }
 
 func (d *Export) Show() {
