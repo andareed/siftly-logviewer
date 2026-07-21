@@ -50,7 +50,7 @@ func (m *Model) footerView(width int) string {
 	logging.Debugf("footerView mode=%d cmd=%d", m.view.mode, m.view.command.cmd)
 
 	footerMode := CmdNone
-	modeInput := ""
+	prompt := ""
 	isInputMode := false
 	switch m.view.mode {
 	case modeView:
@@ -58,23 +58,19 @@ func (m *Model) footerView(width int) string {
 	case modeComment:
 		footerMode = CmdComment
 		isInputMode = true
+		prompt = "comment: "
 	case modeCommand:
 		isInputMode = true
 		footerMode = m.view.command.cmd
-		modeInput = m.commandValue()
+		prompt = m.commandPrompt(footerMode) + m.commandValue() + m.commandPreviewSuffix()
 	case modeTimeWindow:
 		footerMode = CmdTimeWindowSet
 		isInputMode = true
+		prompt = "edit time window"
 	}
 
-	hints := "v view · c comment · t time · / search · ? help"
-	if m.graphConfig.Enabled {
-		hints += " · w graph · W export graph"
-	}
+	hints := m.footerHints(isInputMode, footerMode)
 	selectionCount := m.selectedRowCount()
-	if selectionCount > 0 && !isInputMode {
-		hints = "j/k or arrows extend · ctrl+c copy · m mark · space/esc clear · ? help"
-	}
 
 	debugInfo := ""
 	if logging.IsDebugMode() && !isInputMode {
@@ -86,22 +82,18 @@ func (m *Model) footerView(width int) string {
 	}
 
 	status := ""
-	if m.view.notice.Msg != "" {
+	statusKind := ""
+	hintNotice := (m.view.modeHintSeq > 0 && m.view.notice.Seq == m.view.modeHintSeq) ||
+		(m.view.prefixHintSeq > 0 && m.view.notice.Seq == m.view.prefixHintSeq)
+	if m.view.notice.Msg != "" && !hintNotice {
 		status = ui.NoticeText(m.view.notice.Msg, m.view.notice.Type)
+		statusKind = m.view.notice.Type
 	}
 	if status == "" {
-		status = m.timeWindowStatusLabel()
+		status = m.searchStatusLabel()
 	}
-	if selectionCount > 0 && !isInputMode {
-		selectionStatus := fmt.Sprintf("%d rows selected", selectionCount)
-		if selectionCount == 1 {
-			selectionStatus = "1 row selected"
-		}
-		if strings.TrimSpace(status) == "" {
-			status = selectionStatus
-		} else {
-			status = selectionStatus + " | " + status
-		}
+	if status == "" && m.table.timeWindow.Enabled {
+		status = m.timeWindowStatusLabel()
 	}
 	if !isInputMode && debugInfo != "" {
 		if strings.TrimSpace(status) == "" {
@@ -111,19 +103,31 @@ func (m *Model) footerView(width int) string {
 		}
 	}
 
-	modeBanner := commandLabel(footerMode) + " MODE"
+	modeBanner := commandLabel(footerMode)
 	if m.view.mode == modeTimeWindow {
-		modeBanner = "TIME WINDOW MODE"
+		modeBanner = "TIME WINDOW"
 	}
 	if selectionCount > 0 && m.view.mode == modeView {
-		modeBanner = "RANGE MODE"
+		modeBanner = "RANGE"
+	}
+	if m.view.mode == modeView && m.view.pendingViewPrefix != "" {
+		switch m.view.pendingViewPrefix {
+		case "v":
+			modeBanner = "VIEW"
+		case "c":
+			modeBanner = "COMMENTS"
+		case "t":
+			modeBanner = "TIME"
+		}
 	}
 	return ui.RenderFooter(width, ui.FooterState{
 		ModeLabel:     modeBanner,
+		ActiveStates:  m.footerActiveStates(),
 		StatusMessage: status,
+		StatusKind:    statusKind,
 		Hints:         hints,
 		IsInputMode:   isInputMode,
-		Prompt:        modeInput,
+		Prompt:        prompt,
 	}, ui.DefaultFooterStyles())
 }
 

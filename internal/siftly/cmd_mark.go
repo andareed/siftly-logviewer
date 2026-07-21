@@ -35,17 +35,27 @@ func (m *Model) markDisplayRange(colour ui.MarkColor, startCursor, endCursor int
 		return 0
 	}
 	changed := 0
+	dirty := false
 	for displayIdx := startCursor; displayIdx <= endCursor; displayIdx++ {
 		master := m.table.filteredIndices[displayIdx] // Gets the row
 		id := m.table.rows[master].ID
 		if colour == ui.MarkNone {
+			if _, exists := m.table.markedRows[id]; exists {
+				dirty = true
+			}
 			delete(m.table.markedRows, id)
 			logging.Infof("Cursor: %d with Stable ID %d has been unmarked", displayIdx, id)
 		} else {
+			if existing, exists := m.table.markedRows[id]; !exists || existing != colour {
+				dirty = true
+			}
 			logging.Infof("Cursor: %d with Stable ID %d is being marked with color %s", displayIdx, id, colour)
 			m.table.markedRows[id] = colour
 		}
 		changed++
+	}
+	if dirty {
+		m.markDirty()
 	}
 	return changed
 }

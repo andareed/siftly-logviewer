@@ -98,6 +98,13 @@ func (m *Model) currentColumnOrderSeed() string {
 }
 
 func (m *Model) resetViewLayoutState() tea.Cmd {
+	layoutChanged := false
+	for position, col := range m.table.header {
+		if !col.Visible || col.Index != position {
+			layoutChanged = true
+			break
+		}
+	}
 	sort.SliceStable(m.table.header, func(i, j int) bool {
 		return m.table.header[i].Index < m.table.header[j].Index
 	})
@@ -110,6 +117,9 @@ func (m *Model) resetViewLayoutState() tea.Cmd {
 	m.rebuildRowOrder()
 	m.applyFilter()
 	m.viewport.ScrollLeft(1 << 20)
+	if layoutChanged {
+		m.markDirty()
+	}
 	m.refreshView("reset-view-layout", true)
 	return m.view.notice.Start("Reset view: visibility, sort, order", "", noticeDuration)
 }

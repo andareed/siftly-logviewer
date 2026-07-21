@@ -4,13 +4,16 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	xansi "github.com/charmbracelet/x/ansi"
 )
 
 type FooterState struct {
-	ModeLabel string
-	Prompt    string
+	ModeLabel    string
+	ActiveStates []string
+	Prompt       string
 
 	StatusMessage string
+	StatusKind    string
 	Hints         string
 	IsInputMode   bool
 }
@@ -18,25 +21,35 @@ type FooterState struct {
 type FooterStyles struct {
 	BarBG      lipgloss.Color
 	StatusBG   lipgloss.Color
+	ModeBG     lipgloss.Color
+	ModeFG     lipgloss.Color
 	ModePillBG lipgloss.Color
 	ModePillFG lipgloss.Color
 	FileNameFG lipgloss.Color
 	TextFG     lipgloss.Color
 	DimFG      lipgloss.Color
 	StatusFG   lipgloss.Color
+	SuccessFG  lipgloss.Color
+	WarnFG     lipgloss.Color
+	ErrorFG    lipgloss.Color
 	LegendFG   lipgloss.Color
 }
 
 func DefaultFooterStyles() FooterStyles {
 	return FooterStyles{
-		BarBG:      lipgloss.Color("#2b2b2b"),
-		StatusBG:   lipgloss.Color("#000000"),
+		BarBG:      lipgloss.Color("#202020"),
+		StatusBG:   lipgloss.Color("#101010"),
+		ModeBG:     lipgloss.Color("#3a3a3a"),
+		ModeFG:     lipgloss.Color("#f0f0f0"),
 		ModePillBG: lipgloss.Color("#ff9f1c"),
 		ModePillFG: lipgloss.Color("#000000"),
 		FileNameFG: lipgloss.Color("#e0e0e0"),
 		TextFG:     lipgloss.Color("#cfcfcf"),
 		DimFG:      lipgloss.Color("#a0a0a0"),
-		StatusFG:   lipgloss.Color("#9a9a9a"),
+		StatusFG:   lipgloss.Color("#b8b8b8"),
+		SuccessFG:  lipgloss.Color("#72d99c"),
+		WarnFG:     lipgloss.Color("#f0b45a"),
+		ErrorFG:    lipgloss.Color("#ff6b6b"),
 		LegendFG:   lipgloss.Color("#b0b0b0"),
 	}
 }
@@ -47,10 +60,9 @@ func RenderFooter(width int, st FooterState, styles FooterStyles) string {
 	}
 	st = normalizeFooterState(st)
 
-	modeLine := renderModeLine(width, st, styles)
-	promptLine := renderPromptLine(width, st, styles)
-	statusLine := renderStatusLine(width, st, styles)
-	return modeLine + "\n" + promptLine + "\n" + statusLine
+	stateLine := renderStateLine(width, st, styles)
+	actionLine := renderActionLine(width, st, styles)
+	return stateLine + "\n" + actionLine
 }
 
 func normalizeFooterState(st FooterState) FooterState {
@@ -63,40 +75,129 @@ func normalizeFooterState(st FooterState) FooterState {
 	return st
 }
 
-func renderModeLine(width int, st FooterState, styles FooterStyles) string {
+func renderStateLine(width int, st FooterState, styles FooterStyles) string {
 	mode := strings.ToUpper(strings.TrimSpace(st.ModeLabel))
-	if !strings.HasSuffix(mode, " MODE") {
-		mode += " MODE"
+	modeStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.ModeFG).Background(styles.ModeBG)
+	if st.IsInputMode {
+		modeStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.ModePillFG).Background(styles.ModePillBG)
+	}
+	left := modeStyle.Render(" " + mode + " ")
+
+	stateStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.TextFG).Background(styles.BarBG)
+	warnStateStyle := lipgloss.NewStyle().Bold(true).Foreground(styles.WarnFG).Background(styles.BarBG)
+	separatorStyle := lipgloss.NewStyle().Foreground(styles.DimFG).Background(styles.BarBG)
+	for _, state := range st.ActiveStates {
+		state = strings.TrimSpace(state)
+		if state == "" {
+			continue
+		}
+		style := stateStyle
+		if strings.EqualFold(state, "UNSAVED") {
+			style = warnStateStyle
+		}
+		left += separatorStyle.Render(" │ ") + style.Render(state)
 	}
 
-	text := padRightRunes(truncateRunes(mode, width), width)
-	lineStyle := lipgloss.NewStyle().Foreground(styles.TextFG).Background(styles.BarBG)
-	if st.IsInputMode {
-		lineStyle = lipgloss.NewStyle().Bold(true).Foreground(styles.ModePillFG).Background(styles.ModePillBG)
+	statusStyle := lipgloss.NewStyle().Foreground(statusColor(st.StatusKind, styles)).Background(styles.BarBG)
+	right := ""
+	if status := strings.TrimSpace(st.StatusMessage); status != "" {
+		right = statusStyle.Render(status)
 	}
-	return lineStyle.Render(text)
+
+	if right == "" {
+		return fillFooterLine(xansi.Truncate(left, width, ""), width, styles.BarBG)
+	}
+	if xansi.StringWidth(right) > width/2 {
+		right = xansi.Truncate(right, maxInt(1, width/2), "…")
+	}
+	leftWidth := width - xansi.StringWidth(right) - 1
+	if leftWidth < 1 {
+		return fillFooterLine(xansi.Truncate(right, width, ""), width, styles.BarBG)
+	}
+	left = xansi.Truncate(left, leftWidth, "")
+	gap := width - xansi.StringWidth(left) - xansi.StringWidth(right)
+	return left + lipgloss.NewStyle().Background(styles.BarBG).Render(strings.Repeat(" ", maxInt(0, gap))) + right
 }
 
-func renderPromptLine(width int, st FooterState, styles FooterStyles) string {
-	line := ""
-	if st.IsInputMode {
-		line = "> " + clipInputKeepTail(st.Prompt, width-2)
-	} else {
-		prompt := strings.TrimSpace(st.Prompt)
-		if prompt != "" {
-			line = "> " + clipInputKeepTail(prompt, width-2)
+func renderActionLine(width int, st FooterState, styles FooterStyles) string {
+	background := lipgloss.NewStyle().Background(styles.StatusBG)
+	hint := strings.TrimSpace(st.Hints)
+	if !st.IsInputMode {
+		line := lipgloss.NewStyle().Foreground(styles.DimFG).Background(styles.StatusBG).
+			Render(fitFooterHints(hint, width))
+		return fillFooterLine(line, width, styles.StatusBG)
+	}
+
+	hintWidth := minInt(lipgloss.Width(hint), width/2)
+	promptWidth := width
+	if hintWidth > 0 {
+		promptWidth = width - hintWidth - 2
+		if promptWidth < 12 {
+			hintWidth = 0
+			promptWidth = width
 		}
 	}
-
-	line = padRightRunes(truncateRunes(line, width), width)
-	style := lipgloss.NewStyle().Background(styles.StatusBG).Foreground(styles.TextFG)
-	return style.Render(line)
+	prompt := "> " + clipInputKeepTail(st.Prompt, maxInt(0, promptWidth-2))
+	prompt = lipgloss.NewStyle().Foreground(styles.TextFG).Background(styles.StatusBG).Render(prompt)
+	if hintWidth == 0 {
+		return fillFooterLine(xansi.Truncate(prompt, width, ""), width, styles.StatusBG)
+	}
+	hints := fitFooterHints(hint, hintWidth)
+	hints = lipgloss.NewStyle().Foreground(styles.DimFG).Background(styles.StatusBG).Render(hints)
+	gap := width - xansi.StringWidth(prompt) - xansi.StringWidth(hints)
+	return prompt + background.Render(strings.Repeat(" ", maxInt(0, gap))) + hints
 }
 
-func renderStatusLine(width int, st FooterState, styles FooterStyles) string {
-	line := padRightRunes(truncateRunes(strings.TrimSpace(st.StatusMessage), width), width)
-	style := lipgloss.NewStyle().Background(styles.StatusBG).Foreground(styles.StatusFG)
-	return style.Render(line)
+func fitFooterHints(hints string, width int) string {
+	hints = strings.TrimSpace(hints)
+	if width <= 0 || hints == "" {
+		return ""
+	}
+	if lipgloss.Width(hints) <= width {
+		return hints
+	}
+	parts := strings.Split(hints, "   ")
+	fitted := ""
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		candidate := part
+		if fitted != "" {
+			candidate = fitted + "   " + part
+		}
+		if lipgloss.Width(candidate) > width {
+			break
+		}
+		fitted = candidate
+	}
+	if fitted != "" {
+		return fitted
+	}
+	return truncateRunes(hints, width)
+}
+
+func statusColor(kind string, styles FooterStyles) lipgloss.Color {
+	switch strings.ToLower(strings.TrimSpace(kind)) {
+	case "success":
+		return styles.SuccessFG
+	case "warn":
+		return styles.WarnFG
+	case "error":
+		return styles.ErrorFG
+	default:
+		return styles.StatusFG
+	}
+}
+
+func fillFooterLine(line string, width int, background lipgloss.Color) string {
+	line = xansi.Truncate(line, width, "")
+	padding := width - xansi.StringWidth(line)
+	if padding <= 0 {
+		return line
+	}
+	return line + lipgloss.NewStyle().Background(background).Render(strings.Repeat(" ", padding))
 }
 
 func clipInputKeepTail(s string, maxW int) string {
@@ -130,4 +231,18 @@ func padRightRunes(s string, w int) string {
 		return s
 	}
 	return s + strings.Repeat(" ", w-cur)
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

@@ -21,6 +21,8 @@ func (m *Model) handleSystemMsg(msg tea.Msg) (tea.Cmd, bool) {
 		return nil, true
 	case operationTickMsg:
 		return m.handleOperationTick(msg), true
+	case searchIndexChunkMsg:
+		return m.handleSearchIndexChunk(msg), true
 	case saveCompleteMsg:
 		return m.handleSaveComplete(msg), true
 	case graphExportCompleteMsg:

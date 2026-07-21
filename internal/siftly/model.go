@@ -36,6 +36,7 @@ type Model struct {
 	InitialPath             string
 	lastExportFileName      string
 	lastGraphExportFileName string
+	dirty                   bool
 	view                    viewState
 	table                   tableState
 	styles                  ui.Styles

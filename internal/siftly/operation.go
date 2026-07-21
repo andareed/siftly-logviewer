@@ -115,6 +115,7 @@ func (m *Model) handleSaveComplete(msg saveCompleteMsg) tea.Cmd {
 		return m.view.notice.Start("Save error", "error", noticeDuration)
 	}
 	m.fileName = msg.Path
+	m.dirty = false
 	return m.view.notice.Start(fmt.Sprintf("Saved in %s", msg.Duration.Round(time.Millisecond)), "success", noticeDuration)
 }
 
@@ -191,6 +192,7 @@ func (m *Model) handleFilterComplete(msg filterCompleteMsg) tea.Cmd {
 		return nil
 	}
 
+	m.invalidateSearchIndex()
 	m.table.filteredIndices = msg.FilteredIndices
 	if len(m.table.filteredIndices) == 0 {
 		m.cursor = -1
@@ -204,11 +206,12 @@ func (m *Model) handleFilterComplete(msg filterCompleteMsg) tea.Cmd {
 	if label == "" {
 		label = "Filter applied"
 	}
-	return m.view.notice.Start(
+	notice := m.view.notice.Start(
 		fmt.Sprintf("%s (%d rows, %s)", label, len(m.table.filteredIndices), msg.Duration.Round(time.Millisecond)),
 		msg.DoneKind,
 		noticeDuration,
 	)
+	return batchCmd(notice, m.ensureSearchIndex())
 }
 
 func (m *Model) startFullSourceReloadOperation() tea.Cmd {
@@ -252,6 +255,7 @@ func (m *Model) handleFullSourceReloadComplete(msg fullSourceReloadCompleteMsg) 
 	next.fileName = previous.fileName
 	next.lastExportFileName = previous.lastExportFileName
 	next.lastGraphExportFileName = previous.lastGraphExportFileName
+	next.dirty = previous.dirty
 	next.terminalHeight = previous.terminalHeight
 	next.terminalWidth = previous.terminalWidth
 	next.ready = previous.ready

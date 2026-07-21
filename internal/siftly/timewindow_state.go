@@ -96,6 +96,7 @@ func (m *Model) cursorTimestamp() (time.Time, bool) {
 }
 
 func (m *Model) setTimeWindowEdge(ts time.Time, setStart bool) {
+	previous := m.table.timeWindow
 	m.table.timeWindow = featuretimewindow.SetEdge(
 		m.table.timeWindow,
 		ts,
@@ -103,6 +104,9 @@ func (m *Model) setTimeWindowEdge(ts time.Time, setStart bool) {
 		m.table.timeMax,
 		setStart,
 	)
+	if previous != m.table.timeWindow {
+		m.markDirty()
+	}
 	m.view.timeWindow.DraftStart = m.table.timeWindow.Start
 	m.view.timeWindow.DraftEnd = m.table.timeWindow.End
 	m.updateTimeWindowInputsFromDraft()

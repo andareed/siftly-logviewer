@@ -12,13 +12,20 @@ func (m *Model) addComment(comment string) {
 
 	idx := m.table.filteredIndices[m.cursor]
 	hashId := m.table.rows[idx].ID
+	previous := m.table.commentRows[hashId]
 	if comment == "" {
 		delete(m.table.commentRows, hashId)
+		if previous != "" {
+			m.markDirty()
+		}
 		logging.Infof("Clear comment Index[%d] on HashID[%d]", idx, hashId)
 		return
 		//TODO: Probably need this sending a notificatoin
 	}
 	m.table.commentRows[hashId] = comment
+	if previous != comment {
+		m.markDirty()
+	}
 	logging.Infof("Setting Comment[%s] to Index[%d] on HashID[%d]", comment, idx, hashId)
 }
 

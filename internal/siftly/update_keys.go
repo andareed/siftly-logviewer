@@ -164,10 +164,12 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.searchNext() {
 			cmd = m.view.notice.Start("No matches", "warn", noticeDuration)
 		}
+		cmd = batchCmd(cmd, m.ensureSearchIndex())
 	case viewActionSearchPrev:
 		if !m.searchPrev() {
 			cmd = m.view.notice.Start("No matches", "warn", noticeDuration)
 		}
+		cmd = batchCmd(cmd, m.ensureSearchIndex())
 		m.ready = true
 	case viewActionToggleFilter:
 		logging.Infof("Shift F, toggling Filter")
@@ -402,9 +404,13 @@ func (m *Model) quickResetTimeWindow() tea.Cmd {
 	if !m.table.hasTimeBounds {
 		return m.view.notice.Start("No timestamps available", "warn", noticeDuration)
 	}
+	previous := m.table.timeWindow
 	m.table.timeWindow.Enabled = true
 	m.table.timeWindow.Start = m.table.timeMin
 	m.table.timeWindow.End = m.table.timeMax
+	if previous != m.table.timeWindow {
+		m.markDirty()
+	}
 	m.view.timeWindow.DraftStart = m.table.timeWindow.Start
 	m.view.timeWindow.DraftEnd = m.table.timeWindow.End
 	m.updateTimeWindowInputsFromDraft()

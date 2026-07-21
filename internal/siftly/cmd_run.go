@@ -36,11 +36,11 @@ func runJumpCommand(m *Model, raw string) tea.Cmd {
 }
 
 func runSearchCommand(m *Model, raw string) tea.Cmd {
-	m.setSearchQuery(raw)
+	indexCmd := m.setSearchQuery(raw)
 	if m.searchNext() {
-		return nil
+		return indexCmd
 	}
-	return m.view.notice.Start("No matches", "warn", noticeDuration)
+	return batchCmd(indexCmd, m.view.notice.Start("No matches", "warn", noticeDuration))
 }
 
 func runFilterCommand(m *Model, raw string) tea.Cmd {
@@ -67,8 +67,13 @@ func runColumnsCommand(m *Model, raw string) tea.Cmd {
 	}
 	m.view.lastColumnsSpec = buf
 	if strings.EqualFold(buf, "all") {
+		changed := false
 		for i := range m.table.header {
+			changed = changed || !m.table.header[i].Visible
 			m.table.header[i].Visible = true
+		}
+		if changed {
+			m.markDirty()
 		}
 		m.refreshView("show-all-columns", true)
 		return m.view.notice.Start("All columns shown", "", noticeDuration)
@@ -77,6 +82,9 @@ func runColumnsCommand(m *Model, raw string) tea.Cmd {
 	toggled, missing, err := m.toggleColumnsBySpec(buf)
 	if err != nil {
 		return m.view.notice.Start(err.Error(), "warn", noticeDuration)
+	}
+	if len(toggled) > 0 {
+		m.markDirty()
 	}
 	return m.view.notice.Start(columnsNoticeText(toggled, missing), "", noticeDuration)
 }
@@ -93,6 +101,7 @@ func runColumnOrderCommand(m *Model, raw string) tea.Cmd {
 	if len(ordered) == 0 {
 		return m.view.notice.Start("No columns reordered", "warn", noticeDuration)
 	}
+	m.markDirty()
 	if len(missing) > 0 {
 		return m.view.notice.Start("Reordered columns; missing: "+strings.Join(missing, ", "), "warn", noticeDuration)
 	}

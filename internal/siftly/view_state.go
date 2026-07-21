@@ -44,6 +44,7 @@ type viewState struct {
 	notice                  ui.NoticeState
 	operation               operationState
 	searchQuery             string
+	searchIndex             searchIndexState
 	lastColumnsSpec         string
 	pendingViewPrefix       string
 	visibleStart            int

@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	footerRows        = 3
+	footerRows        = 2
 	panelChromeRows   = 4 // top border, header row, separator row, bottom border
 	drawerChromeRows  = 2 // top border, bottom border
 	drawerContentRows = 8
