@@ -24,6 +24,7 @@ const (
 type Model struct {
 	viewport                viewport.Model
 	drawerPort              viewport.Model
+	inspectorPort           viewport.Model
 	ready                   bool
 	cursor                  int // index into rows
 	lastVisibleRowCount     int
@@ -65,8 +66,10 @@ func (m *Model) InitialiseView() {
 	m.clearRowRangeSelection()
 	m.table.showOnlyMarked = false
 	m.drawerPort = viewport.New(0, 0)
+	m.inspectorPort = viewport.New(0, 0)
 	m.view.drawerHeight = 13 // TODO:should be a better way of calcing this rather than hardcoding
 	m.view.drawerOpen = false
+	m.view.inspector = rowInspectorState{selectedField: 0, lastRowIndex: -1, lastField: -1}
 	m.view.mode = modeView
 	if m.graphConfig.Enabled {
 		m.view.graphWindow.MaxKeys = m.graphConfig.MaxKeys

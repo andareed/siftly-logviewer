@@ -23,6 +23,12 @@ const (
 	viewActionMarkMode
 	viewActionQuit
 	viewActionCopyRow
+	viewActionToggleInspector
+	viewActionInspectorNextField
+	viewActionInspectorPrevField
+	viewActionInspectorCopyField
+	viewActionInspectorScrollDown
+	viewActionInspectorScrollUp
 	viewActionToggleRange
 	viewActionClearRange
 	viewActionJumpToStart
@@ -138,6 +144,26 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewActionCopyRow:
 		logging.Infof("Key combination for copying rows to the clipboard")
 		cmd = m.copyRowsToClipboard()
+	case viewActionToggleInspector:
+		m.view.inspector.open = !m.view.inspector.open
+		if m.view.inspector.open {
+			m.view.drawerOpen = false
+			m.view.inspector.hasContent = false
+		}
+		m.refreshView("inspector-toggle", true)
+		didRefresh = true
+	case viewActionInspectorNextField:
+		m.cycleInspectorField(1)
+	case viewActionInspectorPrevField:
+		m.cycleInspectorField(-1)
+	case viewActionInspectorCopyField:
+		cmd = m.copyInspectorFieldToClipboard()
+	case viewActionInspectorScrollDown:
+		m.inspectorPort.ScrollDown(1)
+		didRefresh = true
+	case viewActionInspectorScrollUp:
+		m.inspectorPort.ScrollUp(1)
+		didRefresh = true
 	case viewActionToggleRange:
 		m.toggleRowRangeSelection()
 	case viewActionClearRange:
@@ -250,6 +276,18 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionQuit
 	case key.Matches(msg, Keys.CopyRow):
 		return viewActionCopyRow
+	case key.Matches(msg, Keys.ToggleInspector):
+		return viewActionToggleInspector
+	case m.view.inspector.open && key.Matches(msg, Keys.InspectorNextField):
+		return viewActionInspectorNextField
+	case m.view.inspector.open && key.Matches(msg, Keys.InspectorPrevField):
+		return viewActionInspectorPrevField
+	case m.view.inspector.open && key.Matches(msg, Keys.InspectorCopyField):
+		return viewActionInspectorCopyField
+	case m.view.inspector.open && key.Matches(msg, Keys.InspectorScrollDown):
+		return viewActionInspectorScrollDown
+	case m.view.inspector.open && key.Matches(msg, Keys.InspectorScrollUp):
+		return viewActionInspectorScrollUp
 	case key.Matches(msg, Keys.SelectRange):
 		return viewActionToggleRange
 	case key.Matches(msg, Keys.ClearRange) && m.view.rowRange.active:
@@ -337,6 +375,9 @@ func (m *Model) handleViewPrefixKey(msg tea.KeyMsg) (handled bool, cmd tea.Cmd, 
 		return true, m.enterCommand(CmdComment, "", true, false), false
 	case viewPrefixActionCommentToggleDrawer:
 		m.view.drawerOpen = !m.view.drawerOpen
+		if m.view.drawerOpen {
+			m.view.inspector.open = false
+		}
 		logging.Infof("handleViewPrefixKey: toggled comment drawer to %t", m.view.drawerOpen)
 		return true, nil, true
 	case viewPrefixActionTimeWindowOpen:

@@ -54,6 +54,9 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 			return "w: window   b: set start   e: set end   r: reset   esc: cancel"
 		}
 	}
+	if m.view.inspector.open {
+		return "j/k: rows   tab/shift+tab: fields   J/K: scroll   y: copy field   ctrl+c: copy row   enter: close"
+	}
 	if m.selectedRowCount() > 0 {
 		return "j/k: extend   ctrl+c: copy   m: mark   space/esc: clear   ?: help"
 	}

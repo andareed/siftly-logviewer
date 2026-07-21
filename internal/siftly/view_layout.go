@@ -32,6 +32,20 @@ func (m *Model) recomputeLayout(height int, width int) {
 		m.view.drawerHeight = drawerContentRows + drawerChromeRows
 		viewportHeight -= m.view.drawerHeight
 	}
+	if m.view.inspector.open {
+		m.inspectorPort.Width = viewportWidth
+		contentHeight := m.inspectorDesiredContentHeight(viewportWidth)
+		maxContentHeight := viewportHeight - inspectorChromeRows - 1
+		if contentHeight > maxContentHeight {
+			contentHeight = maxContentHeight
+		}
+		if contentHeight < 1 {
+			contentHeight = 1
+		}
+		m.inspectorPort.Height = contentHeight
+		m.view.inspector.height = contentHeight + inspectorChromeRows
+		viewportHeight -= m.view.inspector.height
+	}
 	if m.graphConfig.Enabled && m.view.graphWindow.Open {
 		graphHeight := m.view.graphWindow.HeightOrDefault()
 		viewportHeight -= graphHeight + 2
@@ -47,12 +61,20 @@ func (m *Model) recomputeLayout(height int, width int) {
 
 func (m *Model) refreshView(reason string, withLayout bool) {
 	logging.Debugf("refreshView: reason=%s layout=%t", reason, withLayout)
+	m.clampCursor()
 	if withLayout {
 		m.recomputeLayout(m.terminalHeight, m.terminalWidth)
+	} else if m.view.inspector.open {
+		desiredHeight := m.inspectorDesiredContentHeight(m.inspectorPort.Width)
+		if desiredHeight != m.inspectorPort.Height {
+			m.recomputeLayout(m.terminalHeight, m.terminalWidth)
+		}
 	}
-	m.clampCursor()
 	if m.view.drawerOpen {
 		m.refreshDrawerContent()
+	}
+	if m.view.inspector.open {
+		m.refreshInspectorContent()
 	}
 	m.viewport.SetContent(m.buildViewportContent())
 }

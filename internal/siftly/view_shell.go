@@ -110,6 +110,9 @@ func (m *Model) footerView(width int) string {
 	if selectionCount > 0 && m.view.mode == modeView {
 		modeBanner = "RANGE"
 	}
+	if m.view.mode == modeView && m.view.inspector.open {
+		modeBanner = "INSPECT"
+	}
 	if m.view.mode == modeView && m.view.pendingViewPrefix != "" {
 		switch m.view.pendingViewPrefix {
 		case "v":
@@ -200,14 +203,21 @@ func (m *Model) mainBodyView(panelW int) string {
 	if m.view.drawerOpen {
 		drawer = m.commentDrawerView(panelW)
 	}
+	inspector := ""
+	if m.view.inspector.open {
+		inspector = m.rowInspectorView(panelW)
+	}
 
-	parts := make([]string, 0, 6)
+	parts := make([]string, 0, 4)
 	if m.graphConfig.Enabled && m.view.graphWindow.Open {
 		parts = append(parts, graphBlock)
 	}
 	parts = append(parts, panel)
 	if m.view.drawerOpen {
 		parts = append(parts, drawer)
+	}
+	if m.view.inspector.open {
+		parts = append(parts, inspector)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
 }

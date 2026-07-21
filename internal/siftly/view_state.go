@@ -26,6 +26,16 @@ type graphRenderCache struct {
 	prepared    featuregraph.Prepared
 }
 
+type rowInspectorState struct {
+	open          bool
+	selectedField int
+	height        int
+	lastRowIndex  int
+	lastField     int
+	lastWidth     int
+	hasContent    bool
+}
+
 type viewState struct {
 	mode                    mode
 	command                 CommandInput
@@ -41,6 +51,7 @@ type viewState struct {
 	graphCache              graphRenderCache
 	drawerOpen              bool
 	drawerHeight            int
+	inspector               rowInspectorState
 	notice                  ui.NoticeState
 	operation               operationState
 	searchQuery             string

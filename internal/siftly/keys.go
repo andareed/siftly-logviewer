@@ -5,42 +5,48 @@ import (
 )
 
 type Keymap struct {
-	Quit          key.Binding
-	MarkMode      key.Binding
-	ShowMarksOnly key.Binding
-	NextMark      key.Binding
-	PrevMark      key.Binding
-	Filter        key.Binding
-	Sort          key.Binding
-	Search        key.Binding
-	ToggleFilter  key.Binding
-	SearchNext    key.Binding
-	SearchPrev    key.Binding
-	TimeWindowSet key.Binding
-	ShowComment   key.Binding
-	EditComment   key.Binding
-	CommentOps    key.Binding
-	TimeOps       key.Binding
-	PageUp        key.Binding
-	PageDown      key.Binding
-	RowDown       key.Binding
-	RowUp         key.Binding
-	OpenHelp      key.Binding
-	ScrollLeft    key.Binding
-	ScrollRight   key.Binding
-	SaveToFile    key.Binding
-	ExportToFile  key.Binding
-	CopyRow       key.Binding
-	SelectRange   key.Binding
-	ClearRange    key.Binding
-	JumpToStart   key.Binding
-	JumpToEnd     key.Binding
-	JumpToLineNo  key.Binding
-	TimeWindow    key.Binding
-	ToggleGraph   key.Binding
-	GraphExport   key.Binding
-	ReloadFull    key.Binding
-	ColumnViewOps key.Binding
+	Quit                key.Binding
+	MarkMode            key.Binding
+	ShowMarksOnly       key.Binding
+	NextMark            key.Binding
+	PrevMark            key.Binding
+	Filter              key.Binding
+	Sort                key.Binding
+	Search              key.Binding
+	ToggleFilter        key.Binding
+	SearchNext          key.Binding
+	SearchPrev          key.Binding
+	TimeWindowSet       key.Binding
+	ShowComment         key.Binding
+	EditComment         key.Binding
+	CommentOps          key.Binding
+	TimeOps             key.Binding
+	PageUp              key.Binding
+	PageDown            key.Binding
+	RowDown             key.Binding
+	RowUp               key.Binding
+	OpenHelp            key.Binding
+	ScrollLeft          key.Binding
+	ScrollRight         key.Binding
+	SaveToFile          key.Binding
+	ExportToFile        key.Binding
+	CopyRow             key.Binding
+	ToggleInspector     key.Binding
+	InspectorNextField  key.Binding
+	InspectorPrevField  key.Binding
+	InspectorCopyField  key.Binding
+	InspectorScrollDown key.Binding
+	InspectorScrollUp   key.Binding
+	SelectRange         key.Binding
+	ClearRange          key.Binding
+	JumpToStart         key.Binding
+	JumpToEnd           key.Binding
+	JumpToLineNo        key.Binding
+	TimeWindow          key.Binding
+	ToggleGraph         key.Binding
+	GraphExport         key.Binding
+	ReloadFull          key.Binding
+	ColumnViewOps       key.Binding
 }
 
 var Keys = Keymap{
@@ -140,6 +146,30 @@ var Keys = Keymap{
 		key.WithKeys("ctrl+c"),
 		key.WithHelp("ctrl+c", "Copy row/selection"),
 	),
+	ToggleInspector: key.NewBinding(
+		key.WithKeys("enter"),
+		key.WithHelp("enter", "Toggle row inspector"),
+	),
+	InspectorNextField: key.NewBinding(
+		key.WithKeys("tab"),
+		key.WithHelp("tab", "Next inspector field"),
+	),
+	InspectorPrevField: key.NewBinding(
+		key.WithKeys("shift+tab"),
+		key.WithHelp("shift+tab", "Previous inspector field"),
+	),
+	InspectorCopyField: key.NewBinding(
+		key.WithKeys("y"),
+		key.WithHelp("y", "Copy inspector field"),
+	),
+	InspectorScrollDown: key.NewBinding(
+		key.WithKeys("J"),
+		key.WithHelp("J", "Scroll inspector down"),
+	),
+	InspectorScrollUp: key.NewBinding(
+		key.WithKeys("K"),
+		key.WithHelp("K", "Scroll inspector up"),
+	),
 	SelectRange: key.NewBinding(
 		key.WithKeys(" "),
 		key.WithHelp("space", "Start/clear row selection"),
@@ -207,6 +237,12 @@ func (k Keymap) Legend(graphEnabled bool, reloadFullEnabled bool) []key.Binding 
 		k.PageUp,
 		k.PageDown,
 		k.CopyRow,
+		k.ToggleInspector,
+		k.InspectorNextField,
+		k.InspectorPrevField,
+		k.InspectorCopyField,
+		k.InspectorScrollDown,
+		k.InspectorScrollUp,
 		k.SelectRange,
 		k.ClearRange,
 		k.ExportToFile,

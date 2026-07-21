@@ -8,11 +8,13 @@ import (
 )
 
 const (
-	footerRows        = 2
-	panelChromeRows   = 4 // top border, header row, separator row, bottom border
-	drawerChromeRows  = 2 // top border, bottom border
-	drawerContentRows = 8
-	panelMinOuterCols = 6 // allows "│ " + at least 2 cells + " │"
+	footerRows              = 2
+	panelChromeRows         = 4 // top border, header row, separator row, bottom border
+	drawerChromeRows        = 2 // top border, bottom border
+	drawerContentRows       = 8
+	inspectorChromeRows     = 2 // top border, bottom border
+	inspectorMaxContentRows = 4
+	panelMinOuterCols       = 6 // allows "│ " + at least 2 cells + " │"
 )
 
 type panelStatusSpec struct {

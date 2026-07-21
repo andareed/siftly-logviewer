@@ -89,3 +89,13 @@ func TestCompletedSearchIndexReportsPosition(t *testing.T) {
 		t.Fatalf("unexpected search status: %q", got)
 	}
 }
+
+func TestFooterShowsInspectorModeHints(t *testing.T) {
+	m := Model{view: viewState{inspector: rowInspectorState{open: true}}}
+	got := m.footerHints(false, CmdNone)
+	for _, want := range []string{"tab/shift+tab: fields", "y: copy field", "ctrl+c: copy row", "enter: close"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("inspector footer hints missing %q: %q", want, got)
+		}
+	}
+}

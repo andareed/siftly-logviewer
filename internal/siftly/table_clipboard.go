@@ -32,6 +32,35 @@ func (m *Model) copyRowsToClipboard() tea.Cmd {
 	return m.view.notice.Start(fmt.Sprintf("Copied %d rows to clipboard", count), "", noticeDuration)
 }
 
+func (m *Model) copyInspectorFieldToClipboard() tea.Cmd {
+	name, value, ok := m.inspectorFieldClipboardText()
+	if !ok {
+		return m.view.notice.Start("No field to copy", "warn", noticeDuration)
+	}
+	if len(value) > maxClipboardBytes {
+		return m.view.notice.Start(
+			fmt.Sprintf("Field exceeds the %d KiB clipboard limit; export instead", maxClipboardBytes/1024),
+			"warn",
+			noticeDuration,
+		)
+	}
+	if err := clipboard.Copy(value); err != nil {
+		logging.Errorf("Clipboard field copy failed: %v", err)
+		return m.view.notice.Start(fmt.Sprintf("Clipboard error: %v", err), "warn", noticeDuration)
+	}
+	return m.view.notice.Start(fmt.Sprintf("Copied %s field", name), "", noticeDuration)
+}
+
+func (m *Model) inspectorFieldClipboardText() (string, string, bool) {
+	row, _, ok := m.currentInspectorRow()
+	if !ok || len(m.table.header) == 0 {
+		return "", "", false
+	}
+	field := m.inspectorFieldIndex()
+	column := m.table.header[field]
+	return inspectorColumnLabel(column, field), inspectorColumnValue(row, column, field), true
+}
+
 func (m *Model) selectedRowsClipboardText() (string, int, error) {
 	start, end, ok := m.actionDisplayRange()
 	if !ok {

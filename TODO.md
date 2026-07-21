@@ -3,7 +3,7 @@
 ## 0.7 TUI polish
 
 - [x] Redesign the footer and status bar to render contextual key hints and clearly show active filter, sort, time window, marks-only, range selection, search position, operation and unsaved states.
-- [ ] Add a persistent row inspector showing every column name and full value, original row number, mark and comment, with field and row copy actions.
+- [x] Add a persistent row inspector showing every column name and full value, original row number, mark and comment, with field and row copy actions.
 - [ ] Track dirty state, warn before quitting with unsaved changes, provide undo for annotations and view operations, and maintain a recovery snapshot.
 - [ ] Show determinate progress for long operations where possible, including rows processed, percentage and elapsed time, with `Esc` cancellation while retaining the previous view.
 - [ ] Add a searchable command palette covering every action and shortcut, and reorganise help into clear command categories.
