@@ -110,7 +110,14 @@ func (m *Model) commandBadge(cmd Command) string { return lookupCommandMeta(cmd)
 
 func (m *Model) commandPrompt(cmd Command) string { return lookupCommandMeta(cmd).Prompt }
 
-func (m *Model) commandHintsLine(cmd Command) string { return lookupCommandMeta(cmd).Hints }
+func (m *Model) commandHintsLine(cmd Command) string {
+	if cmd == CmdMark {
+		if count := m.selectedRowCount(); count > 0 {
+			return "r/g/a: mark selected rows   c: clear selected rows   esc: cancel"
+		}
+	}
+	return lookupCommandMeta(cmd).Hints
+}
 
 func (m *Model) commandSeed(cmd Command) string {
 	switch cmd {

@@ -686,6 +686,7 @@ func restoreLoadedSnapshot(
 	comments map[string]string,
 	timeWin *timeWindowDTO,
 ) error {
+	m.clearRowRangeSelection()
 	m.table.header = append([]ui.ColumnMeta(nil), header...)
 	m.table.rows = rows
 	m.table.showOnlyMarked = false

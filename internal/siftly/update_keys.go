@@ -23,6 +23,8 @@ const (
 	viewActionMarkMode
 	viewActionQuit
 	viewActionCopyRow
+	viewActionToggleRange
+	viewActionClearRange
 	viewActionJumpToStart
 	viewActionJumpToEnd
 	viewActionToggleShowMarks
@@ -134,8 +136,12 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewActionQuit:
 		return m, tea.Quit
 	case viewActionCopyRow:
-		logging.Infof("Key Combination for CopyRow To Clipboard")
-		cmd = m.copyRowToClipboard()
+		logging.Infof("Key combination for copying rows to the clipboard")
+		cmd = m.copyRowsToClipboard()
+	case viewActionToggleRange:
+		m.toggleRowRangeSelection()
+	case viewActionClearRange:
+		m.clearRowRangeSelection()
 	case viewActionJumpToStart:
 		logging.Infof("Jumping to start (if filtered will be first row in filter")
 		m.jumpToStart()
@@ -187,7 +193,7 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		cmd = m.startGraphExportOperation(defaultGraphExportPath(*m))
 	case viewActionRowDown:
-		if m.cursor < len(m.table.rows)-1 {
+		if m.cursor < len(m.table.filteredIndices)-1 {
 			m.cursor++
 		}
 	case viewActionRowUp:
@@ -242,6 +248,10 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionQuit
 	case key.Matches(msg, Keys.CopyRow):
 		return viewActionCopyRow
+	case key.Matches(msg, Keys.SelectRange):
+		return viewActionToggleRange
+	case key.Matches(msg, Keys.ClearRange) && m.view.rowRange.active:
+		return viewActionClearRange
 	case key.Matches(msg, Keys.JumpToStart):
 		return viewActionJumpToStart
 	case key.Matches(msg, Keys.JumpToEnd):

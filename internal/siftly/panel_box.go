@@ -20,6 +20,7 @@ type panelStatusSpec struct {
 	TotalRows  int
 	Filter     string
 	MarksOn    bool
+	Selected   int
 	RightText  string
 }
 
@@ -67,6 +68,7 @@ func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) s
 	filterRaw := strings.TrimSpace(status.Filter)
 	includeFilter := filterRaw != "" && !strings.EqualFold(filterRaw, "none")
 	includeMarks := status.MarksOn
+	includeSelection := status.Selected > 0
 
 	filterLimit := len([]rune(filterRaw))
 	titleLimit := len([]rune(title))
@@ -91,6 +93,8 @@ func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) s
 			includeFilter,
 			includeMarks,
 			status.RightText,
+			status.Selected,
+			includeSelection,
 		)
 
 		leftW := xansi.StringWidth(left)
@@ -115,6 +119,10 @@ func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) s
 			// 4) then drop Marks
 			includeMarks = false
 			titleLimit = fullTitleLimit
+		case includeSelection:
+			// 5) selection is dropped only when the terminal is extremely narrow.
+			includeSelection = false
+			titleLimit = fullTitleLimit
 		default:
 			// Last resort: plain border if terminal is extremely narrow.
 			return "┌" + strings.Repeat("─", width-2) + "┐"
@@ -122,11 +130,14 @@ func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) s
 	}
 }
 
-func buildPanelRightStatusWithOverride(current, total int, filter string, includeFilter, includeMarks bool, rightOverride string) string {
+func buildPanelRightStatusWithOverride(current, total int, filter string, includeFilter, includeMarks bool, rightOverride string, selected int, includeSelection bool) string {
 	if strings.TrimSpace(rightOverride) != "" {
 		return rightOverride
 	}
 	parts := []string{fmt.Sprintf("Rows %d/%d", current, total)}
+	if includeSelection {
+		parts = append(parts, fmt.Sprintf("Selected: %d", selected))
+	}
 	if includeFilter {
 		parts = append(parts, "Filter: "+filter)
 	}

@@ -9,6 +9,7 @@ const (
 	rowTextFGColor         = "#c0c0c0"
 	rowSelectedTextFGColor = "#e0e0e0"
 	rowSelectedBGColor     = "#3a3a3a"
+	rowRangeBGColor        = "#2a2a2a"
 )
 
 var (
@@ -45,24 +46,25 @@ var (
 
 func SiftlyStyles() ui.Styles {
 	return ui.Styles{
-		App:             appStyle,
-		Header:          headerStyle,
-		Row:             rowStyle,
-		RowSelected:     rowSelectedStyle,
-		Cell:            cellStyle,
-		Table:           tableStyle,
-		GraphArea:       graphStyle,
-		RedMarker:       redMarker,
-		GreenMarker:     greenMarker,
-		AmberMarker:     amberMarker,
-		CommentArea:     commentArea,
-		TimeWindowArea:  timeWindowArea,
-		SearchHighlight: searchHighlight,
-		RowTextFGColor:  lipgloss.Color(rowTextFGColor),
-		RowSelectedFG:   lipgloss.Color(rowSelectedTextFGColor),
-		RowSelectedBG:   lipgloss.Color(rowSelectedBGColor),
-		DefaultMarker:   " ",
-		PillMarker:      "▐",
-		CommentMarker:   "[*]",
+		App:                appStyle,
+		Header:             headerStyle,
+		Row:                rowStyle,
+		RowSelected:        rowSelectedStyle,
+		Cell:               cellStyle,
+		Table:              tableStyle,
+		GraphArea:          graphStyle,
+		RedMarker:          redMarker,
+		GreenMarker:        greenMarker,
+		AmberMarker:        amberMarker,
+		CommentArea:        commentArea,
+		TimeWindowArea:     timeWindowArea,
+		SearchHighlight:    searchHighlight,
+		RowTextFGColor:     lipgloss.Color(rowTextFGColor),
+		RowSelectedFG:      lipgloss.Color(rowSelectedTextFGColor),
+		RowSelectedBG:      lipgloss.Color(rowSelectedBGColor),
+		RowRangeSelectedBG: lipgloss.Color(rowRangeBGColor),
+		DefaultMarker:      " ",
+		PillMarker:         "▐",
+		CommentMarker:      "[*]",
 	}
 }

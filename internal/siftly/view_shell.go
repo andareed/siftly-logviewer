@@ -71,6 +71,10 @@ func (m *Model) footerView(width int) string {
 	if m.graphConfig.Enabled {
 		hints += " · w graph · W export graph"
 	}
+	selectionCount := m.selectedRowCount()
+	if selectionCount > 0 && !isInputMode {
+		hints = "j/k or arrows extend · ctrl+c copy · m mark · space/esc clear · ? help"
+	}
 
 	debugInfo := ""
 	if logging.IsDebugMode() && !isInputMode {
@@ -88,6 +92,17 @@ func (m *Model) footerView(width int) string {
 	if status == "" {
 		status = m.timeWindowStatusLabel()
 	}
+	if selectionCount > 0 && !isInputMode {
+		selectionStatus := fmt.Sprintf("%d rows selected", selectionCount)
+		if selectionCount == 1 {
+			selectionStatus = "1 row selected"
+		}
+		if strings.TrimSpace(status) == "" {
+			status = selectionStatus
+		} else {
+			status = selectionStatus + " | " + status
+		}
+	}
 	if !isInputMode && debugInfo != "" {
 		if strings.TrimSpace(status) == "" {
 			status = debugInfo
@@ -99,6 +114,9 @@ func (m *Model) footerView(width int) string {
 	modeBanner := commandLabel(footerMode) + " MODE"
 	if m.view.mode == modeTimeWindow {
 		modeBanner = "TIME WINDOW MODE"
+	}
+	if selectionCount > 0 && m.view.mode == modeView {
+		modeBanner = "RANGE MODE"
 	}
 	return ui.RenderFooter(width, ui.FooterState{
 		ModeLabel:     modeBanner,
@@ -239,6 +257,7 @@ func (m *Model) currentPanelStatus() panelStatusSpec {
 		TotalRows:  totalRows,
 		Filter:     filterValue,
 		MarksOn:    m.table.showOnlyMarked,
+		Selected:   m.selectedRowCount(),
 	}
 }
 

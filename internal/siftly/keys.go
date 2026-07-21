@@ -31,6 +31,8 @@ type Keymap struct {
 	SaveToFile    key.Binding
 	ExportToFile  key.Binding
 	CopyRow       key.Binding
+	SelectRange   key.Binding
+	ClearRange    key.Binding
 	JumpToStart   key.Binding
 	JumpToEnd     key.Binding
 	JumpToLineNo  key.Binding
@@ -136,7 +138,15 @@ var Keys = Keymap{
 	),
 	CopyRow: key.NewBinding(
 		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "Copy row to clipboard"),
+		key.WithHelp("ctrl+c", "Copy row/selection"),
+	),
+	SelectRange: key.NewBinding(
+		key.WithKeys(" "),
+		key.WithHelp("space", "Start/clear row selection"),
+	),
+	ClearRange: key.NewBinding(
+		key.WithKeys("esc"),
+		key.WithHelp("esc", "Clear row selection"),
 	),
 	JumpToStart: key.NewBinding(
 		key.WithKeys("g", "home"),
@@ -197,6 +207,8 @@ func (k Keymap) Legend(graphEnabled bool, reloadFullEnabled bool) []key.Binding 
 		k.PageUp,
 		k.PageDown,
 		k.CopyRow,
+		k.SelectRange,
+		k.ClearRange,
 		k.ExportToFile,
 		k.SaveToFile,
 		k.RowUp,

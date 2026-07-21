@@ -149,6 +149,7 @@ func (m *Model) startFilterOperation(doneMessage string) tea.Cmd {
 }
 
 func (m *Model) startFilterOperationWithKind(doneMessage, doneKind string) tea.Cmd {
+	m.clearRowRangeSelection()
 	m.ensureTableDerivedState()
 	currentRowHash := m.currentRowHashID()
 	job := filterJob{
@@ -214,6 +215,7 @@ func (m *Model) startFullSourceReloadOperation() tea.Cmd {
 	if m.fullSourceReload == nil {
 		return m.view.notice.Start("No prefiltered source to reload", "warn", noticeDuration)
 	}
+	m.clearRowRangeSelection()
 
 	reload := m.fullSourceReload
 	currentRowHash := m.currentRowHashID()

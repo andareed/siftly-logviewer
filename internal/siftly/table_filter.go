@@ -29,6 +29,7 @@ type filterJob struct {
 func (m *Model) applyFilter() {
 	logging.Debugf("applyFilter called")
 	defer m.bumpGraphDataVersion()
+	m.clearRowRangeSelection()
 	m.ensureTableDerivedState()
 	// Remember the hash of what we have currently selected.
 	currentRowHash := m.currentRowHashID()                // should be called before we reset the filtered indices

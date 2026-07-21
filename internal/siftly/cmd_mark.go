@@ -27,9 +27,15 @@ func (m *Model) markDisplayedRows(colour ui.MarkColor, nextCount int) int {
 	if endCursor >= len(m.table.filteredIndices) {
 		endCursor = len(m.table.filteredIndices) - 1
 	}
+	return m.markDisplayRange(colour, m.cursor, endCursor)
+}
 
+func (m *Model) markDisplayRange(colour ui.MarkColor, startCursor, endCursor int) int {
+	if startCursor < 0 || endCursor < startCursor || endCursor >= len(m.table.filteredIndices) {
+		return 0
+	}
 	changed := 0
-	for displayIdx := m.cursor; displayIdx <= endCursor; displayIdx++ {
+	for displayIdx := startCursor; displayIdx <= endCursor; displayIdx++ {
 		master := m.table.filteredIndices[displayIdx] // Gets the row
 		id := m.table.rows[master].ID
 		if colour == ui.MarkNone {
@@ -44,8 +50,19 @@ func (m *Model) markDisplayedRows(colour ui.MarkColor, nextCount int) int {
 	return changed
 }
 
+func (m *Model) markSelectedRows(colour ui.MarkColor) int {
+	start, end, ok := m.selectedDisplayRange()
+	if !ok {
+		return 0
+	}
+	return m.markDisplayRange(colour, start, end)
+}
+
 func (m *Model) handleMarkCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if msg.Type == tea.KeyRunes && runesAreDigits(msg.Runes) {
+		if m.selectedRowCount() > 0 {
+			return m, m.view.notice.Start("The active row selection already defines the range", "warn", noticeDuration)
+		}
 		m.setCommandValue(m.commandValue() + string(msg.Runes))
 		return m, nil
 	}
@@ -72,11 +89,16 @@ func (m *Model) handleMarkCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			mark = ui.MarkNone
 		}
 
-		nextCount, err := strconv.Atoi(strings.TrimSpace(m.commandValue()))
-		if err != nil && strings.TrimSpace(m.commandValue()) != "" {
-			return m, m.view.notice.Start("Invalid mark count", "warn", noticeDuration)
+		changed := 0
+		if m.selectedRowCount() > 0 {
+			changed = m.markSelectedRows(mark)
+		} else {
+			nextCount, err := strconv.Atoi(strings.TrimSpace(m.commandValue()))
+			if err != nil && strings.TrimSpace(m.commandValue()) != "" {
+				return m, m.view.notice.Start("Invalid mark count", "warn", noticeDuration)
+			}
+			changed = m.markDisplayedRows(mark, nextCount)
 		}
-		changed := m.markDisplayedRows(mark, nextCount)
 		_ = m.exitCommand(false)
 
 		m.refreshView("mark", false)

@@ -10,25 +10,27 @@ import (
 )
 
 type RowStyles struct {
-	Row             lipgloss.Style
-	RowSelected     lipgloss.Style
-	Cell            lipgloss.Style
-	RedMarker       lipgloss.Style
-	GreenMarker     lipgloss.Style
-	AmberMarker     lipgloss.Style
-	SearchHighlight lipgloss.Style
-	RowTextFGColor  lipgloss.Color
-	RowSelectedFG   lipgloss.Color
-	RowSelectedBG   lipgloss.Color
-	DefaultMarker   string
-	PillMarker      string
-	CommentMarker   string
+	Row                lipgloss.Style
+	RowSelected        lipgloss.Style
+	Cell               lipgloss.Style
+	RedMarker          lipgloss.Style
+	GreenMarker        lipgloss.Style
+	AmberMarker        lipgloss.Style
+	SearchHighlight    lipgloss.Style
+	RowTextFGColor     lipgloss.Color
+	RowSelectedFG      lipgloss.Color
+	RowSelectedBG      lipgloss.Color
+	RowRangeSelectedBG lipgloss.Color
+	DefaultMarker      string
+	PillMarker         string
+	CommentMarker      string
 }
 
 type RowRenderInput struct {
 	Cols           []string
 	OriginalIndex  int
 	Selected       bool
+	RangeSelected  bool
 	SearchQuery    string
 	TotalRows      int
 	CommentPresent bool
@@ -54,12 +56,8 @@ func RenderRowCells(cols []string, colsMeta []ColumnMeta, style lipgloss.Style) 
 }
 
 func RenderRow(in RowRenderInput) (string, int) {
-	rowBgStyle := in.Styles.Row
-	rowPrefix := bgSeq(lipgloss.Color("")) + fgSeq(in.Styles.RowTextFGColor)
-	if in.Selected {
-		rowBgStyle = in.Styles.RowSelected
-		rowPrefix = bgSeq(in.Styles.RowSelectedBG) + fgSeq(in.Styles.RowSelectedFG)
-	}
+	rowBgStyle, rowFG, rowBG := resolveRowVisualStyle(in.Styles, in.Selected, in.RangeSelected)
+	rowPrefix := bgSeq(rowBG) + fgSeq(rowFG)
 	rowSuffix := termenv.CSI + "0m"
 
 	standardMarker := getRowMarker(in.Mark, in.Styles)
@@ -99,6 +97,18 @@ func RenderRow(in RowRenderInput) (string, int) {
 	}
 
 	return strings.Join(lines, "\n"), rowHeight
+}
+
+func resolveRowVisualStyle(styles RowStyles, cursor, rangeSelected bool) (lipgloss.Style, lipgloss.Color, lipgloss.Color) {
+	if cursor {
+		return styles.RowSelected, styles.RowSelectedFG, styles.RowSelectedBG
+	}
+	if rangeSelected {
+		return styles.RowSelected.
+			Background(styles.RowRangeSelectedBG).
+			Foreground(styles.RowTextFGColor), styles.RowTextFGColor, styles.RowRangeSelectedBG
+	}
+	return styles.Row, styles.RowTextFGColor, lipgloss.Color("")
 }
 
 func getRowMarker(mark MarkColor, styles RowStyles) string {
