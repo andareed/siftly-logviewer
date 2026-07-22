@@ -50,6 +50,7 @@ type Model struct {
 
 // SetStyles injects UI styles from the wrapper package (e.g., hostlog).
 func (m *Model) SetStyles(styles ui.Styles) {
+	styles.Tokens = ui.ResolveDesignTokens(styles.Tokens)
 	m.styles = styles
 }
 
@@ -71,7 +72,7 @@ func (m *Model) InitialiseView() {
 	m.table.showOnlyMarked = false
 	m.drawerPort = viewport.New(0, 0)
 	m.inspectorPort = viewport.New(0, 0)
-	m.view.drawerHeight = 13 // TODO:should be a better way of calcing this rather than hardcoding
+	m.view.drawerHeight = 0
 	m.view.drawerOpen = false
 	m.view.inspector = rowInspectorState{selectedField: 0, lastRowIndex: -1, lastField: -1}
 	m.view.mode = modeView

@@ -8,8 +8,10 @@ import (
 )
 
 type recordingDialog struct {
-	visible bool
-	updates []tea.Msg
+	visible      bool
+	updates      []tea.Msg
+	resizeWidth  int
+	resizeHeight int
 }
 
 func (d *recordingDialog) Init() tea.Cmd { return nil }
@@ -25,6 +27,10 @@ func (d *recordingDialog) Blur()           {}
 func (d *recordingDialog) IsVisible() bool { return d.visible }
 func (d *recordingDialog) Show()           { d.visible = true }
 func (d *recordingDialog) Hide()           { d.visible = false }
+func (d *recordingDialog) Resize(width, height int) {
+	d.resizeWidth = width
+	d.resizeHeight = height
+}
 
 func TestHandleDialogInputForwardsNonKeyMessages(t *testing.T) {
 	dialog := &recordingDialog{visible: true}
@@ -40,6 +46,19 @@ func TestHandleDialogInputForwardsNonKeyMessages(t *testing.T) {
 	}
 	if len(dialog.updates) != 1 || dialog.updates[0] != msg {
 		t.Fatalf("dialog updates = %#v, want forwarded message %#v", dialog.updates, msg)
+	}
+}
+
+func TestWindowHandlerResizesOpenDialog(t *testing.T) {
+	dialog := &recordingDialog{visible: true}
+	m := &Model{activeDialog: dialog}
+
+	_, handled := m.handleWindowMsg(tea.WindowSizeMsg{Width: 72, Height: 20})
+	if !handled {
+		t.Fatal("window resize was not handled")
+	}
+	if dialog.resizeWidth != 72 || dialog.resizeHeight != 20 {
+		t.Fatalf("dialog resized to %dx%d, want 72x20", dialog.resizeWidth, dialog.resizeHeight)
 	}
 }
 

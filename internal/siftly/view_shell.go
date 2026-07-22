@@ -130,7 +130,7 @@ func (m *Model) footerView(width int) string {
 		Hints:         hints,
 		IsInputMode:   isInputMode,
 		Prompt:        prompt,
-	}, ui.DefaultFooterStyles())
+	}, ui.FooterStylesFromTokens(m.styles.ResolvedTokens()))
 }
 
 func (m *Model) View() string {
@@ -145,7 +145,7 @@ func (m *Model) View() string {
 			lipgloss.Center, lipgloss.Center,
 			m.activeDialog.View(),
 			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceBackground(lipgloss.Color("236")),
+			lipgloss.WithWhitespaceBackground(m.styles.ResolvedTokens().Colors.SurfaceOverlay),
 		)
 	}
 
@@ -194,28 +194,28 @@ func (m *Model) mainBodyView(panelW int) string {
 	panel := m.mainPanelView(panelW)
 
 	graphBlock := ""
-	if m.graphConfig.Enabled && m.view.graphWindow.Open {
+	if m.graphConfig.Enabled && m.view.graphWindow.Open && m.view.graphHeight > 0 {
 		graphBlock = m.renderGraphBlock(panelW)
 	}
 
 	drawer := ""
-	if m.view.drawerOpen {
+	if m.view.drawerOpen && m.view.drawerHeight > 0 {
 		drawer = m.commentDrawerView(panelW)
 	}
 	inspector := ""
-	if m.view.inspector.open {
+	if m.view.inspector.open && m.view.inspector.height > 0 {
 		inspector = m.rowInspectorView(panelW)
 	}
 
 	parts := make([]string, 0, 4)
-	if m.graphConfig.Enabled && m.view.graphWindow.Open {
+	if m.graphConfig.Enabled && m.view.graphWindow.Open && m.view.graphHeight > 0 {
 		parts = append(parts, graphBlock)
 	}
 	parts = append(parts, panel)
-	if m.view.drawerOpen {
+	if m.view.drawerOpen && m.view.drawerHeight > 0 {
 		parts = append(parts, drawer)
 	}
-	if m.view.inspector.open {
+	if m.view.inspector.open && m.view.inspector.height > 0 {
 		parts = append(parts, inspector)
 	}
 	return lipgloss.JoinVertical(lipgloss.Left, parts...)
@@ -237,7 +237,7 @@ func (m *Model) mainPanelView(panelWidth int) string {
 	innerLines = append(innerLines, splitContentLines(m.viewport.View())...)
 
 	panelHeight := m.viewport.Height + panelChromeRows
-	return renderBoxedPanel(defaultSaveName(*m), m.currentPanelStatus(), innerLines, panelWidth, panelHeight)
+	return renderBoxedPanel(defaultSaveName(*m), m.currentPanelStatus(), innerLines, panelWidth, panelHeight, m.styles.ResolvedTokens())
 }
 
 func (m *Model) commentDrawerView(panelWidth int) string {
@@ -248,7 +248,7 @@ func (m *Model) commentDrawerView(panelWidth int) string {
 	panelHeight := m.drawerPort.Height + drawerChromeRows
 	status := m.currentPanelStatus()
 	status.RightText = fmt.Sprintf("Chars %d", m.currentCommentCharCount())
-	return renderBoxedPanel("Comment", status, innerLines, panelWidth, panelHeight)
+	return renderBoxedPanel("Comment", status, innerLines, panelWidth, panelHeight, m.styles.ResolvedTokens())
 }
 
 func (m *Model) currentPanelStatus() panelStatusSpec {
@@ -279,17 +279,12 @@ func (m *Model) currentCommentCharCount() int {
 }
 
 func (m *Model) renderTimeWindowDialog(base string) string {
-	dialogW := m.terminalWidth - 12
-	if dialogW < 72 {
-		dialogW = 72
-	}
-	if dialogW > 140 {
-		dialogW = 140
-	}
+	dialogW := responsiveOverlayWidth(m.terminalWidth, 104, 52)
 
 	body := m.timeWindowDrawerView(dialogW - 4)
 	lines := splitContentLines(body)
-	box := renderBoxedPanel("Time Window", panelStatusSpec{RightText: "esc: close"}, lines, dialogW, len(lines)+2)
+	lines = fitTimeWindowDialogLines(lines, max(1, m.terminalHeight-4))
+	box := renderBoxedPanel("Time Window", panelStatusSpec{RightText: "esc: close"}, lines, dialogW, len(lines)+2, m.styles.ResolvedTokens())
 
 	_ = base // reserved for future backdrop rendering
 	return lipgloss.Place(
@@ -297,8 +292,45 @@ func (m *Model) renderTimeWindowDialog(base string) string {
 		lipgloss.Center, lipgloss.Center,
 		box,
 		lipgloss.WithWhitespaceChars(" "),
-		lipgloss.WithWhitespaceBackground(lipgloss.Color("236")),
+		lipgloss.WithWhitespaceBackground(m.styles.ResolvedTokens().Colors.SurfaceOverlay),
 	)
+}
+
+func responsiveOverlayWidth(terminalWidth, preferred, minimum int) int {
+	available := terminalWidth - 4
+	if available < 6 {
+		available = max(6, terminalWidth)
+	}
+	if preferred > available {
+		preferred = available
+	}
+	if preferred < minimum && available >= minimum {
+		preferred = minimum
+	}
+	return max(6, preferred)
+}
+
+func fitTimeWindowDialogLines(lines []string, maximum int) []string {
+	if maximum <= 0 {
+		return nil
+	}
+	result := append([]string(nil), lines...)
+	for _, index := range []int{9, 2, 6, 0, 3} {
+		if len(result) <= maximum || index >= len(lines) {
+			continue
+		}
+		target := lines[index]
+		for i, line := range result {
+			if line == target {
+				result = append(result[:i], result[i+1:]...)
+				break
+			}
+		}
+	}
+	if len(result) > maximum {
+		result = result[:maximum]
+	}
+	return result
 }
 
 func (m *Model) metaStatusView(width int) string {
@@ -321,7 +353,7 @@ func (m *Model) metaStatusView(width int) string {
 	filterValue := m.filterStatusValue()
 	filterConfigured := filterValue != "" && !strings.EqualFold(filterValue, "none")
 
-	stateBlock := renderMetaStateBlock(width, currentRow, totalRows, filterValue, filterConfigured, m.table.showOnlyMarked)
+	stateBlock := renderMetaStateBlock(width, currentRow, totalRows, filterValue, filterConfigured, m.table.showOnlyMarked, m.styles.ResolvedTokens())
 	stateWidth := lipgloss.Width(stateBlock)
 	leftWidth := width - stateWidth
 	if leftWidth <= 0 {
@@ -329,10 +361,8 @@ func (m *Model) metaStatusView(width int) string {
 	}
 
 	fileName := truncateFilenameMiddlePreserveExt(defaultSaveName(*m), leftWidth)
-	fileStyle := lipgloss.NewStyle().
-		Bold(false).
-		Foreground(lipgloss.Color("252")).
-		Width(leftWidth)
+	tokens := m.styles.ResolvedTokens()
+	fileStyle := tokens.Emphasis.Strong.Bold(false).Width(leftWidth)
 
 	return fileStyle.Render(fileName) + stateBlock
 }
@@ -342,9 +372,10 @@ type metaField struct {
 	value string
 }
 
-func renderMetaStateBlock(maxWidth int, currentRow int, totalRows int, filterValue string, filterActive bool, marksOnly bool) string {
-	labelStyle := lipgloss.NewStyle().Bold(false).Faint(true)
-	valueStyle := lipgloss.NewStyle().Bold(false)
+func renderMetaStateBlock(maxWidth int, currentRow int, totalRows int, filterValue string, filterActive bool, marksOnly bool, tokenOptions ...ui.DesignTokens) string {
+	tokens := panelDesignTokens(tokenOptions)
+	labelStyle := tokens.Emphasis.Muted
+	valueStyle := tokens.Emphasis.Normal
 
 	includeFilter := filterActive
 	includeMarks := marksOnly

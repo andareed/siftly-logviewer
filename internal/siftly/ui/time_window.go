@@ -17,6 +17,7 @@ type TimeWindowDrawerInput struct {
 	StepLabel     string
 	ErrorMsg      string
 	AreaStyle     lipgloss.Style
+	Tokens        DesignTokens
 }
 
 type TimeWindowScrubberInput struct {
@@ -38,7 +39,8 @@ func FormatStep(step time.Duration) string {
 
 func RenderTimeWindowDrawer(in TimeWindowDrawerInput) string {
 	innerWidth := max(0, in.Width-2)
-	lineStyle := lipgloss.NewStyle().Width(innerWidth)
+	tokens := ResolveDesignTokens(in.Tokens)
+	lineStyle := tokens.Emphasis.Normal.Width(innerWidth)
 
 	startLine := "Start  " + in.StartInput
 	endLine := "End    " + in.EndInput
@@ -53,25 +55,17 @@ func RenderTimeWindowDrawer(in TimeWindowDrawerInput) string {
 		statusMsg = "⚠ No timestamps available"
 	}
 
-	statusStyle := lipgloss.NewStyle().Width(innerWidth)
-	switch statusKind {
-	case "success":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("42"))
-	case "warn":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("214"))
-	case "error":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("196"))
-	}
+	statusStyle := tokens.NoticeStyle(statusKind).Width(innerWidth)
 
-	action := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render("[ Enter Apply ]")
-	cancel := lipgloss.NewStyle().Faint(true).Render("Esc Cancel")
-	reset := lipgloss.NewStyle().Faint(true).Render("R Reset")
+	action := tokens.States.Accent.Render("[ Enter Apply ]")
+	cancel := tokens.Emphasis.Muted.Render("Esc Cancel")
+	reset := tokens.Emphasis.Muted.Render("R Reset")
 	actionLine := action + "   " + cancel + "   " + reset
 	actionPad := innerWidth - lipgloss.Width(actionLine)
 	if actionPad > 0 {
 		actionLine = strings.Repeat(" ", actionPad) + actionLine
 	}
-	controlsLine := lipgloss.NewStyle().Faint(true).Render(
+	controlsLine := tokens.Emphasis.Muted.Render(
 		fmt.Sprintf("Tab: next field  ←/→: move %s  Shift+←/→: expand %s  -/+: step", in.StepLabel, in.StepLabel),
 	)
 

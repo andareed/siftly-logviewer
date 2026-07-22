@@ -1,6 +1,8 @@
 package siftly
 
 import (
+	"strings"
+
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
 )
 
@@ -41,5 +43,18 @@ func (m *Model) refreshDrawerContent() {
 	logging.Debug("refreshDrawerContent called..")
 	currentComment := m.getCommentContent(m.currentRowHashID())
 	logging.Debugf("Comment Input and Drawer Port being set to: %s", currentComment)
-	m.drawerPort.SetContent(currentComment)
+	wrapped := wrapInspectorText(currentComment, max(1, m.drawerPort.Width))
+	m.drawerPort.SetContent(strings.Join(wrapped, "\n"))
+}
+
+func (m *Model) drawerDesiredContentHeight(width int) int {
+	comment := m.getCommentContent(m.currentRowHashID())
+	height := len(wrapInspectorText(comment, max(1, width)))
+	if height < 1 {
+		height = 1
+	}
+	if height > drawerContentRows {
+		height = drawerContentRows
+	}
+	return height
 }

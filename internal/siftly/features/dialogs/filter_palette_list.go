@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func (d *FilterPalette) rebuildFiltered() {
@@ -131,15 +130,7 @@ func (d *FilterPalette) movePage(delta int) {
 }
 
 func (d *FilterPalette) listPanelContentHeight() int {
-	innerHeight := d.height - 4
-	if innerHeight < 5 {
-		innerHeight = 5
-	}
-	panelHeight := innerHeight - 8
-	if panelHeight < 3 {
-		panelHeight = 3
-	}
-	return panelHeight
+	return d.listHeight
 }
 
 func (d *FilterPalette) visibleSlots() int {
@@ -198,8 +189,9 @@ func (d FilterPalette) renderTabs(width int) string {
 	presets := fmt.Sprintf(" Presets (%d) ", len(d.filteredPresets))
 	history := fmt.Sprintf(" History (%d) ", len(d.filteredHistory))
 
-	active := lipgloss.NewStyle().Bold(true).Underline(true)
-	inactive := lipgloss.NewStyle().Faint(true)
+	tokens := d.tokens
+	active := tokens.States.Accent.Underline(true)
+	inactive := tokens.Emphasis.Muted
 
 	if d.activeTab == filterTabPresets {
 		presets = active.Render(presets)
@@ -214,12 +206,15 @@ func (d FilterPalette) renderTabs(width int) string {
 }
 
 func (d FilterPalette) renderActiveList(width, maxLines int) []string {
+	if maxLines <= 0 {
+		return nil
+	}
 	lines := make([]string, 0, maxLines)
 
 	switch d.activeTab {
 	case filterTabPresets:
 		if len(d.filteredPresets) == 0 {
-			return []string{lipgloss.NewStyle().Faint(true).Render("No preset matches")}
+			return []string{d.tokens.Emphasis.Subtle.Render("No preset matches")}
 		}
 		slots := d.visibleSlots()
 		end := d.presetScroll + slots
@@ -244,7 +239,7 @@ func (d FilterPalette) renderActiveList(width, maxLines int) []string {
 			patternLine2 = "    " + patternLine2
 
 			if i == d.presetCursor {
-				style := lipgloss.NewStyle().Bold(true)
+				style := d.tokens.States.Selected.Bold(true)
 				if d.selectedFG != "" {
 					style = style.Foreground(d.selectedFG)
 				}
@@ -256,16 +251,16 @@ func (d FilterPalette) renderActiveList(width, maxLines int) []string {
 				lines = append(lines, style.Render(patternLine2))
 			} else {
 				lines = append(lines, descLine)
-				lines = append(lines, lipgloss.NewStyle().Faint(true).Render(patternLine1))
-				lines = append(lines, lipgloss.NewStyle().Faint(true).Render(patternLine2))
+				lines = append(lines, d.tokens.Emphasis.Subtle.Render(patternLine1))
+				lines = append(lines, d.tokens.Emphasis.Subtle.Render(patternLine2))
 			}
 			if i < end-1 {
-				lines = append(lines, lipgloss.NewStyle().Faint(true).Render(ruleLine(width)))
+				lines = append(lines, d.tokens.Borders.Subtle.Render(ruleLine(width)))
 			}
 		}
 	case filterTabHistory:
 		if len(d.filteredHistory) == 0 {
-			return []string{lipgloss.NewStyle().Faint(true).Render("No history matches")}
+			return []string{d.tokens.Emphasis.Subtle.Render("No history matches")}
 		}
 		slots := d.visibleSlots()
 		end := d.historyScroll + slots
@@ -277,7 +272,7 @@ func (d FilterPalette) renderActiveList(width, maxLines int) []string {
 			rendered := line
 			if i == d.historyCursor {
 				line = "> " + truncate(d.filteredHistory[i], width-2)
-				style := lipgloss.NewStyle().Bold(true)
+				style := d.tokens.States.Selected.Bold(true)
 				if d.selectedFG != "" {
 					style = style.Foreground(d.selectedFG)
 				}
@@ -288,13 +283,13 @@ func (d FilterPalette) renderActiveList(width, maxLines int) []string {
 			}
 			lines = append(lines, rendered)
 			if i < end-1 {
-				lines = append(lines, lipgloss.NewStyle().Faint(true).Render(ruleLine(width)))
+				lines = append(lines, d.tokens.Borders.Subtle.Render(ruleLine(width)))
 			}
 		}
 	}
 
 	if len(lines) == 0 {
-		return []string{lipgloss.NewStyle().Faint(true).Render("No items")}
+		return []string{d.tokens.Emphasis.Subtle.Render("No items")}
 	}
 	if maxLines > 0 && len(lines) > maxLines {
 		return lines[:maxLines]

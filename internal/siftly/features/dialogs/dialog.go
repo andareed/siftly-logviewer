@@ -68,3 +68,8 @@ type Dialog interface {
 	Show()
 	Hide()
 }
+
+// Resizable is implemented by dialogs that adapt while they are open.
+type Resizable interface {
+	Resize(terminalWidth, terminalHeight int)
+}

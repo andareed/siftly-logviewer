@@ -2,7 +2,6 @@ package graph
 
 import (
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type Input struct {
@@ -19,6 +18,7 @@ type Input struct {
 	AggregateMode   string
 	LayoutMode      string
 	FillMode        string
+	Tokens          ui.DesignTokens
 }
 
 type point struct {
@@ -78,14 +78,7 @@ func Prepare(in Input) Prepared {
 
 	scaleMode := NormalizeScaleMode(in.ScaleMode)
 	layoutMode := NormalizeLayoutMode(in.LayoutMode)
-	palette := []lipgloss.Color{
-		lipgloss.Color("#ff6b6b"),
-		lipgloss.Color("#4ecdc4"),
-		lipgloss.Color("#ffe66d"),
-		lipgloss.Color("#5b8def"),
-		lipgloss.Color("#a66dd4"),
-		lipgloss.Color("#f08a24"),
-	}
+	palette := ui.ResolveDesignTokens(in.Tokens).GraphSeries
 
 	plotHeight, includeAxis, includeCursor, includeLegend := graphGeometry(in.Height)
 	if plotHeight <= 0 {

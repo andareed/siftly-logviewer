@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -24,41 +25,27 @@ type CommandPalette struct {
 	visibleRows int
 	selectedFG  lipgloss.Color
 	selectedBG  lipgloss.Color
+	tokens      ui.DesignTokens
 }
 
-func NewCommandPalette(items []CommandItem, terminalWidth, terminalHeight int, selectedFG, selectedBG lipgloss.Color) *CommandPalette {
-	width := 88
-	if available := terminalWidth - 4; terminalWidth > 0 && available < width {
-		width = available
-	}
-	if width < 32 {
-		width = 32
-	}
-
-	visibleRows := terminalHeight - 12
-	if visibleRows < 5 {
-		visibleRows = 5
-	}
-	if visibleRows > 16 {
-		visibleRows = 16
-	}
-
+func NewCommandPalette(items []CommandItem, terminalWidth, terminalHeight int, selectedFG, selectedBG lipgloss.Color, tokenOptions ...ui.DesignTokens) *CommandPalette {
 	input := textinput.New()
 	input.Prompt = ""
 	input.Placeholder = "Search commands, categories or shortcuts"
 	input.CharLimit = 256
-	input.Width = max(12, width-8)
+	tokens := dialogDesignTokens(tokenOptions)
+	styleDialogTextInput(&input, tokens)
 
 	d := &CommandPalette{
-		visible:     true,
-		input:       input,
-		items:       append([]CommandItem(nil), items...),
-		width:       width,
-		visibleRows: visibleRows,
-		selectedFG:  selectedFG,
-		selectedBG:  selectedBG,
+		visible:    true,
+		input:      input,
+		items:      append([]CommandItem(nil), items...),
+		selectedFG: selectedFG,
+		selectedBG: selectedBG,
+		tokens:     tokens,
 	}
 	d.rebuildFiltered()
+	d.Resize(terminalWidth, terminalHeight)
 	return d
 }
 
@@ -129,21 +116,22 @@ func (d CommandPalette) View() string {
 	}
 
 	content := []string{
-		dialogSectionLabel("Search"),
+		dialogSectionLabel("Search", d.tokens),
 		d.input.View(),
 		"",
-		dialogStatusLine(statusKind, status),
-		renderDialogActionRowWithKeys(innerWidth, "Enter", "Run", primaryEnabled, "Esc", "Close"),
+		dialogStatusLine(statusKind, status, d.tokens),
+		renderDialogActionRowWithKeys(innerWidth, "Enter", "Run", primaryEnabled, "Esc", "Close", d.tokens),
 		"",
-		dialogSectionLabel("Commands"),
+		dialogSectionLabel("Commands", d.tokens),
 	}
 	content = append(content, d.renderRows(innerWidth)...)
 
 	return renderDialogPanel(
 		"Command Palette",
-		dialogTopRightState(fmt.Sprintf("%d commands", len(d.items))),
+		dialogTopRightState(fmt.Sprintf("%d commands", len(d.items)), d.tokens),
 		d.width,
 		content,
+		d.tokens,
 	)
 }
 
@@ -264,15 +252,35 @@ func (d CommandPalette) selectedItem() (CommandItem, bool) {
 }
 
 func (d CommandPalette) renderRows(width int) []string {
-	rows := make([]string, 0, d.visibleRows)
-	end := min(len(d.filtered), d.scroll+d.visibleRows)
+	rowCount := min(len(d.filtered), d.visibleRows)
+	if rowCount <= 0 {
+		return nil
+	}
+	rows := make([]string, 0, rowCount)
+	end := min(len(d.filtered), d.scroll+rowCount)
 	for i := d.scroll; i < end; i++ {
 		rows = append(rows, d.renderRow(d.filtered[i], width, i == d.cursor))
 	}
-	for len(rows) < d.visibleRows {
-		rows = append(rows, "")
-	}
 	return rows
+}
+
+func (d *CommandPalette) Resize(terminalWidth, terminalHeight int) {
+	d.width = responsiveDialogWidth(terminalWidth, d.preferredWidth(), 64)
+	d.input.Width = max(1, d.width-8)
+	heightLimit := responsiveDialogHeight(terminalHeight, 25)
+	d.visibleRows = boundedListRows(heightLimit, 9, -1, 16)
+	d.ensureCursorVisible()
+}
+
+func (d CommandPalette) preferredWidth() int {
+	innerWidth := lipgloss.Width(d.input.Placeholder)
+	for _, item := range d.items {
+		rowWidth := lipgloss.Width(item.Category) + lipgloss.Width(item.Title) + lipgloss.Width(item.Shortcut) + 6
+		if rowWidth > innerWidth {
+			innerWidth = rowWidth
+		}
+	}
+	return clampDialogWidth(innerWidth+4, 64, 88)
 }
 
 func (d CommandPalette) renderRow(item CommandItem, width int, selected bool) string {
@@ -300,12 +308,19 @@ func (d CommandPalette) renderRow(item CommandItem, width int, selected bool) st
 	line = xansi.Truncate(line, width, "")
 	line = padCommandCell(line, width)
 
-	style := lipgloss.NewStyle()
+	tokens := d.tokens
+	style := tokens.Emphasis.Normal
 	if !item.Enabled {
-		style = style.Faint(true)
+		style = tokens.Emphasis.Subtle
 	}
 	if selected {
-		style = style.Foreground(d.selectedFG).Background(d.selectedBG)
+		style = tokens.States.Selected
+		if d.selectedFG != "" {
+			style = style.Foreground(d.selectedFG)
+		}
+		if d.selectedBG != "" {
+			style = style.Background(d.selectedBG)
+		}
 	}
 	return style.Render(line)
 }

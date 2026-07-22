@@ -260,6 +260,7 @@ func (m *Model) timeWindowDrawerView(width int) string {
 		StepLabel:     sharedui.FormatStep(m.timeWindowStep()),
 		ErrorMsg:      tw.ErrorMsg,
 		AreaStyle:     lipgloss.NewStyle(),
+		Tokens:        m.styles.ResolvedTokens(),
 	})
 }
 

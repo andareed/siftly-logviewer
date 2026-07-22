@@ -55,7 +55,7 @@ func TestRowInspectorIncludesCompleteRowMetadataAndReorderedFields(t *testing.T)
 	m.inspectorPort = viewport.New(92, 4)
 	m.inspectorPort.SetContent(content)
 	topBorder := strings.Split(stripANSI(m.rowInspectorView(96)), "\n")[0]
-	for _, want := range []string{"Details", "Source 117", "GREEN"} {
+	for _, want := range []string{"Row Inspector", "Source 117", "GREEN"} {
 		if !strings.Contains(topBorder, want) {
 			t.Fatalf("inspector header missing %q: %q", want, topBorder)
 		}

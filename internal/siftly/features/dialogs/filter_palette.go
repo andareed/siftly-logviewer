@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -45,8 +46,10 @@ type FilterPalette struct {
 
 	width      int
 	height     int
+	listHeight int
 	selectedFG lipgloss.Color
 	selectedBG lipgloss.Color
+	tokens     ui.DesignTokens
 }
 
 type FilterPreset struct {
@@ -54,29 +57,21 @@ type FilterPreset struct {
 	Description string
 }
 
-func NewFilterPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color) *FilterPalette {
-	return newFilterPaletteDialog(presets, history, width, height, selectedFG, selectedBG, lastFilterPaletteTab)
+func NewFilterPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color, tokenOptions ...ui.DesignTokens) *FilterPalette {
+	return newFilterPaletteDialog(presets, history, width, height, selectedFG, selectedBG, lastFilterPaletteTab, tokenOptions...)
 }
 
-func NewFilterHistoryPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color) *FilterPalette {
-	return newFilterPaletteDialog(presets, history, width, height, selectedFG, selectedBG, filterTabHistory)
+func NewFilterHistoryPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color, tokenOptions ...ui.DesignTokens) *FilterPalette {
+	return newFilterPaletteDialog(presets, history, width, height, selectedFG, selectedBG, filterTabHistory, tokenOptions...)
 }
 
-func newFilterPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color, initialTab filterPaletteTab) *FilterPalette {
-	w := width - 4
-	h := height - 4
-	if w < 64 {
-		w = 64
-	}
-	if h < 14 {
-		h = 14
-	}
-
+func newFilterPaletteDialog(presets []FilterPreset, history []string, width, height int, selectedFG, selectedBG lipgloss.Color, initialTab filterPaletteTab, tokenOptions ...ui.DesignTokens) *FilterPalette {
 	ti := textinput.New()
 	ti.Placeholder = "type to filter..."
 	ti.Prompt = "Filter: "
 	ti.CharLimit = 512
-	ti.Width = w - 12
+	tokens := dialogDesignTokens(tokenOptions)
+	styleDialogTextInput(&ti, tokens)
 
 	d := &FilterPalette{
 		visible:       true,
@@ -87,14 +82,38 @@ func newFilterPaletteDialog(presets []FilterPreset, history []string, width, hei
 		focusArea:     filterFocusInput,
 		presetCursor:  -1,
 		historyCursor: -1,
-		width:         w,
-		height:        h,
 		selectedFG:    selectedFG,
 		selectedBG:    selectedBG,
+		tokens:        tokens,
 	}
 	d.rebuildFiltered()
+	d.Resize(width, height)
 	d.ensureCursorVisible()
 	return d
+}
+
+func (d *FilterPalette) Resize(terminalWidth, terminalHeight int) {
+	d.width = responsiveDialogWidth(terminalWidth, d.preferredWidth(), 48)
+	d.height = responsiveDialogHeight(terminalHeight, 28)
+	d.listHeight = boundedListRows(d.height, 11, -1, 17)
+	d.input.Width = max(1, d.width-12)
+	d.ensureCursorVisible()
+}
+
+func (d FilterPalette) preferredWidth() int {
+	innerWidth := lipgloss.Width("Focus: Input  Ctrl+Space: toggle  Tab: switch tabs")
+	for _, preset := range d.presets {
+		candidate := max(lipgloss.Width(preset.Description), lipgloss.Width(preset.Pattern)+4)
+		if candidate > innerWidth {
+			innerWidth = candidate
+		}
+	}
+	for _, history := range d.history {
+		if candidate := lipgloss.Width(history) + 2; candidate > innerWidth {
+			innerWidth = candidate
+		}
+	}
+	return clampDialogWidth(innerWidth+4, 48, 96)
 }
 
 func (d FilterPalette) Init() tea.Cmd { return d.input.Focus() }
@@ -200,7 +219,7 @@ func (d FilterPalette) View() string {
 	if d.activeTab == filterTabHistory {
 		matchCount = len(d.filteredHistory)
 	}
-	topRight := dialogTopRightState(fmt.Sprintf("%d matches", matchCount))
+	topRight := dialogTopRightState(fmt.Sprintf("%d matches", matchCount), d.tokens)
 
 	tabs := d.renderTabs(innerWidth)
 	focusLabel := "Input"
@@ -223,7 +242,7 @@ func (d FilterPalette) View() string {
 	}
 
 	contentLines := []string{
-		dialogSectionLabel("Query"),
+		dialogSectionLabel("Query", d.tokens),
 		d.input.View(),
 		"",
 		dialogStatusLine(func() string {
@@ -231,16 +250,16 @@ func (d FilterPalette) View() string {
 				return "error"
 			}
 			return "success"
-		}(), statusMsg),
-		renderDialogActionRowWithKeys(innerWidth, "Enter", "Apply", primaryEnabled, "Esc", "Cancel"),
+		}(), statusMsg, d.tokens),
+		renderDialogActionRowWithKeys(innerWidth, "Enter", "Apply", primaryEnabled, "Esc", "Cancel", d.tokens),
 		"",
-		dialogSectionLabel("List"),
+		dialogSectionLabel("List", d.tokens),
 		tabs,
-		lipgloss.NewStyle().Faint(true).Render("Focus: " + focusLabel + "  Ctrl+Space: toggle  Tab: switch tabs  ↑/↓/Pg: move"),
+		d.tokens.Emphasis.Muted.Render("Focus: " + focusLabel + "  Ctrl+Space: toggle  Tab: switch tabs  ↑/↓/Pg: move"),
 		strings.Join(d.renderActiveList(innerWidth, d.listPanelContentHeight()), "\n"),
 	}
 
-	return renderDialogPanel("Filter Palette", topRight, d.width, contentLines)
+	return renderDialogPanel("Filter Palette", topRight, d.width, contentLines, d.tokens)
 }
 
 func (d *FilterPalette) Show() {

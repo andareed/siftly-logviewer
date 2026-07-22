@@ -191,6 +191,7 @@ func (m *Model) openFilterPalette(history bool) tea.Cmd {
 			m.terminalHeight,
 			m.styles.RowSelectedFG,
 			m.styles.RowSelectedBG,
+			m.styles.ResolvedTokens(),
 		)
 	} else {
 		m.activeDialog = dialogs.NewFilterPaletteDialog(
@@ -200,6 +201,7 @@ func (m *Model) openFilterPalette(history bool) tea.Cmd {
 			m.terminalHeight,
 			m.styles.RowSelectedFG,
 			m.styles.RowSelectedBG,
+			m.styles.ResolvedTokens(),
 		)
 	}
 	m.activeDialog.Show()

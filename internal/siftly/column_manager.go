@@ -31,6 +31,7 @@ func (m *Model) openColumnManager() tea.Cmd {
 		m.terminalHeight,
 		m.styles.RowSelectedFG,
 		m.styles.RowSelectedBG,
+		m.styles.ResolvedTokens(),
 	)
 	m.activeDialog.Show()
 	return m.activeDialog.Init()

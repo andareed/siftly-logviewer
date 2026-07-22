@@ -1,269 +1,160 @@
-# Siftly Apps How-To Guide
+# Siftly How-To Guide
 
-This guide explains how to run and use the Siftly terminal apps, with screenshot placeholders you can replace.
+This guide covers the shared interface used by `hostlog`, `todaylog`, `pluginlog`, and the interactive `devfmt export` view. Commands that depend on an application feature, such as the `todaylog` graph, appear in help only when that feature is available.
 
-## 1. Build the apps
+## Start An Application
 
-Run from repo root:
-
-```bash
-go build -o ./dist/hostlog ./cmd/hostlog
-go build -o ./dist/todaylog ./cmd/todaylog
-go build -o ./dist/pluginlog ./cmd/pluginlog
-go build -o ./dist/devfmt ./cmd/devfmt
-```
-
-[SCREENSHOT: build-complete-terminal]
-`Show terminal after successful build commands`
-
-## 2. App quick map
-
-- `hostlog`: Opens host log files (`.csv` or `.json`)
-- `todaylog`: Opens today log files (`.csv` or `.json`)
-- `pluginlog`: Opens plugin log files (`.log` or `.json`)
-- `devfmt`: Device info viewer with subcommands (`list-groups`, `list-categories`, `show`, `export`)
-
-Default preset files in the project root:
-- `hostlog-filters.json`
-- `todaylog-filters.json`
-- `pluginlog-filters.json`
-- `devfmt-filters.json`
-
-[SCREENSHOT: app-quick-map]
-`Optional screenshot of this section or a terminal help output`
-
-## 3. Start each app
-
-### hostlog
+Build the local binaries:
 
 ```bash
-./dist/hostlog --debug debug.log --input testdata/hostlog.csv
+mkdir -p dist
+go build -o dist/hostlog ./cmd/hostlog
+go build -o dist/todaylog ./cmd/todaylog
+go build -o dist/pluginlog ./cmd/pluginlog
+go build -o dist/devfmt ./cmd/devfmt
 ```
 
-or:
+Open source data or a saved Siftly JSON snapshot:
 
 ```bash
-go run ./cmd/hostlog --debug debug.log testdata/hostlog.csv
+./dist/hostlog testdata/hostlog.csv
+./dist/todaylog /path/to/today.log
+./dist/pluginlog /path/to/plugin.log
+./dist/devfmt export --input /path/to/devinfo.dump.gz --group sw
 ```
 
-[SCREENSHOT: hostlog-main-view]
-`Main table view after loading hostlog data`
+Use `--debug debug.log` when diagnostic logging is needed. The application writes relative `--filter-presets` and `--filter-history` paths in the directory from which it was launched.
 
-### todaylog
+## Read The Interface
 
-```bash
-./dist/todaylog --debug debug.log --input <path-to-today-file.csv-or-json>
-```
+![Main table view with row inspector](docs/sample-view.png)
 
-or:
+- The framed table header shows the input filename, current displayed row count, active filter, marks-only state, and selection count.
+- Rows remain single-line for scanning. Open the row inspector with `Enter` when a complete value is needed.
+- The first footer line shows the current mode and active states. The second line changes its key hints to match the current mode, prefix, selection, or inspector.
+- Notices and long-running operation progress appear at the right of the footer.
 
-```bash
-go run ./cmd/todaylog --debug debug.log <path-to-today-file.csv-or-json>
-```
+Press `?` for the full keyboard reference. Press `p` to search commands by action, category, shortcut, description, or related term.
 
-[SCREENSHOT: todaylog-main-view]
-`Main table view after loading todaylog data`
+![Keyboard reference](docs/help-view.png)
 
-### pluginlog
+## Navigate And Inspect Rows
 
-```bash
-./dist/pluginlog --debug debug.log --input <path-to-plugin.log>
-```
+| Task | Keys |
+|---|---|
+| Move one displayed row | `j` / `k` or `Down` / `Up` |
+| Move one page | `Ctrl+D` / `Ctrl+U` or `PgDn` / `PgUp` |
+| Scroll columns | `h` / `l` or `Left` / `Right` |
+| First/last displayed row | `g` / `G` or `Home` / `End` |
+| Original source line | `:`, enter the line number, then `Enter` |
+| Toggle row inspector | `Enter` |
+| Select inspector field | `Tab` / `Shift+Tab` |
+| Scroll inspector | `J` / `K` |
+| Copy focused inspector value | `y` |
 
-or:
+The current row is independent of a range selection. Commands that operate on rows use the selected displayed-row range when one is active; otherwise they use the current row.
 
-```bash
-go run ./cmd/pluginlog --debug debug.log <path-to-plugin.log>
-```
+## Search And Filter
 
-[SCREENSHOT: pluginlog-main-view]
-`Main table view after loading plugin log data`
+### Search Without Hiding Rows
 
-### devfmt
+1. Press `/`.
+2. Enter case-insensitive text and press `Enter`.
+3. Use `n` and `N` for the next and previous match.
 
-Run interactive export directly from a file:
+The footer reports the current match position, such as `Match 4/127`.
 
-```bash
-./dist/devfmt export --input testdata/devinfo.dump.gz --group sw --debug debug.log
-```
+### Filter Displayed Rows
 
-Or stream input:
+1. Press `f`.
+2. Enter a regular expression and press `Enter`.
+3. Press `F` to disable or re-enable the configured filter.
 
-```bash
-zcat testdata/devinfo.dump.gz | ./dist/devfmt export --input - --group sw --debug debug.log
-```
+Filtering matches one complete logical row, including all columns, so expressions such as `fstool_va.*seq` work across column boundaries without requiring users to enable a multiline regular-expression mode.
 
-Useful discovery commands:
+While entering a filter, use `Ctrl+P` for configured presets or `Ctrl+H` for filter history. The history file is writable state; set `--filter-history /path/to/history.json` when the launch directory is not an appropriate location.
 
-```bash
-./dist/devfmt list-groups --input testdata/devinfo.dump.gz
-./dist/devfmt list-categories --input testdata/devinfo.dump.gz
-```
+For very large raw today logs, `--prefilter REGEX` reduces data before parsing. This is deliberately separate from the interactive filter. Use `Ctrl+R` to reload the complete source.
 
-[SCREENSHOT: devfmt-export-view]
-`Rendered siftly table opened by devfmt export`
+## Select, Copy, And Mark Rows
 
-## 4. Core keyboard controls (all table viewers)
+1. Press `Space` on the first row of a range.
+2. Move with the normal navigation keys; the footer reports the number selected.
+3. Press `Ctrl+C` to copy the selected rows, or enter a mark command.
+4. Press `Space` or `Esc` to clear the range selection.
 
-- `q`: quit
-- `j` / `k` or `↓` / `↑`: move row down/up
-- `u` / `d` or `PgUp` / `PgDn`: page up/down
-- `h` / `l` or `←` / `→`: horizontal scroll
-- `g` / `G`: jump to top/bottom
-- `:` then line number then `Enter`: jump to line
-- `?`: open help dialog
-
-[SCREENSHOT: help-dialog]
-`Help modal showing command list`
-
-## 5. Search, filter, mark, comment workflow
-
-### Search
-
-1. Press `/`
-2. Type search text
-3. Press `Enter`
-4. Use `n` / `N` for next/previous match
-
-[SCREENSHOT: search-in-footer]
-`Footer command mode while entering a search`
-
-### Filter
-
-1. Press `f`
-2. Type regex pattern
-3. Press `Enter` to apply
-4. Press `F` to toggle the current filter on/off
-5. Optional: inside filter mode press `Ctrl+P` to open filter palette presets/history
-
-[SCREENSHOT: filter-command]
-`Regex filter entered in command bar`
-
-[SCREENSHOT: filter-palette]
-`Filter palette modal with presets/history`
-
-### Mark rows (RAG)
-
-1. Press `m`
-2. Press:
-   - `r` for red
-   - `a` for amber
-   - `g` for green
-   - `c` to clear mark
-3. Press `]` / `[` to jump next/previous marked row
-4. Press `M` to toggle "show only marked rows"
-
-[SCREENSHOT: mark-mode]
-`Mark mode hint shown; row about to be marked`
-
-[SCREENSHOT: marked-rows]
-`Rows with visible red/amber/green markers`
-
-### Comments
-
-1. Press `c`, then `e` to edit comment on selected row
-2. Type comment and press `Enter`
-3. Press `c`, then `v` to toggle comment drawer
-
-[SCREENSHOT: comment-edit]
-`Comment command mode with text input`
-
-[SCREENSHOT: comment-drawer]
-`Drawer open showing comment content`
-
-## 6. View/layout operations
-
-### Column visibility
-
-1. Press `v`, then `c`
-2. Enter column names or indexes (comma/space separated)
-3. Press `Enter`
-4. Use `all` to show all columns
-
-[SCREENSHOT: columns-toggle]
-`Columns command with selected fields`
-
-### Sort
-
-1. Press `v`, then `s`
-2. Enter sort expression:
-   - `<column> asc`
-   - `<column> desc`
-   - `off` (reset sorting)
-3. Press `Enter`
-
-Examples:
+Mark commands use `r`, `g`, `a`, and `c` for red, green, amber, and clear:
 
 ```text
-timestamp desc
-3 asc
-off
+m r       mark the current row red
+m 5 g     mark the current row and next five displayed rows green
+m c       clear the current row's mark
 ```
 
-[SCREENSHOT: sort-command]
-`Sort expression entered in command bar`
+When a range selection is active, `m r`, `m g`, `m a`, or `m c` applies to the selected rows and a numeric count is unnecessary. Use `]`/`[` to move between displayed marked rows and `M` to toggle marked rows only.
 
-### Column order
+## Add Comments
 
-1. Press `v`, then `o`
-2. Enter desired order by names or indexes
-3. Press `Enter`
+- `c e`: edit or clear the current-row comment.
+- `c v`: toggle the comment drawer.
 
-Example:
+Comments are annotations and set the `UNSAVED` state. The comment drawer and row inspector size themselves to the available terminal space and content.
+
+## Manage Columns
+
+Press `v` to open the column manager.
+
+![Column manager](docs/column-manager-view.png)
+
+| Key | Column manager action |
+|---|---|
+| `/` | Search columns |
+| `Space` | Show/hide the focused column |
+| `s` | Cycle ascending, descending, and no sort |
+| `f` | Freeze/unfreeze the focused column |
+| `a` / `A` | Auto-fit the focused/all visible columns |
+| `J` / `K` | Move the focused column down/up |
+| `r` | Queue a reset to the application defaults |
+| `Enter` / `Esc` | Apply/cancel changes |
+
+Frozen columns remain before scrolling columns. The manager prevents hiding the last visible column.
+
+## Set A Time Window
+
+- `t w`: open the time-window editor.
+- `t b`: set the start from the current row timestamp.
+- `t e`: set the end from the current row timestamp.
+- `t r`: reset to the complete source time range.
+
+The footer shows `TIME WINDOW` while a window is active.
+
+## Save And Export
+
+### Save A Reloadable Snapshot
+
+Press `s` to open **Save Siftly JSON**. The snapshot contains its own source data, stable row IDs, marks, comments, and Siftly state, so it remains consistent even if the original backend data later changes. Column names are stored once and row arrays are emitted on single lines to keep files compact and grep-friendly.
+
+### Export Filtered Data
+
+Press `e d` to open **Export Filtered Data**. This writes only the currently filtered rows as CSV and is not a reloadable Siftly session.
+
+### Export A Graph
+
+In a graph-enabled application, press `w` to toggle the graph and `e g` to export it. Graph export writes beside the input file using a timestamped name such as:
 
 ```text
-timestamp, host, message, severity
+today-graph-2026-07-22_14-05-06.svg
 ```
 
-[SCREENSHOT: column-order-command]
-`Column order command before apply`
+Save and filtered-data export dialogs begin in the input file's directory and allow the target path to be changed before confirming.
 
-### Reset layout
+## Recover And Revisit Work
 
-- Press `v`, then `r` to reset visibility, sort, and order to defaults
-
-[SCREENSHOT: layout-reset-notice]
-`Notice banner after layout reset`
-
-## 7. Time window controls
-
-- `t`, then `w`: open time window panel
-- `t`, then `b`: set window start from selected row timestamp
-- `t`, then `e`: set window end from selected row timestamp
-- `t`, then `r`: reset full window range
-
-[SCREENSHOT: time-window-panel]
-`Time window panel open`
-
-[SCREENSHOT: time-window-notice]
-`Notice after setting start/end from cursor`
-
-## 8. Save and export
-
-- Press `s` to save session (JSON snapshot with marks/comments)
-- Press `e` to export output (CSV)
-- Reopen a saved session by launching app with the saved `.json` file
-
-Examples:
+- `u` / `r`: undo or redo annotation and view changes.
+- `q`: quit. Unsaved changes require an explicit save, discard, or cancel decision.
+- Reopen a Siftly JSON snapshot by passing it to the same application that created it.
 
 ```bash
-./dist/hostlog --input session.json
-./dist/pluginlog --input plugin-session.json
+./dist/hostlog /path/to/investigation.json
+./dist/todaylog /path/to/today.json
 ```
-
-[SCREENSHOT: save-dialog]
-`Save dialog with .json filename`
-
-[SCREENSHOT: export-dialog]
-`Export dialog with .csv filename`
-
-## 9. Recommended screenshot checklist
-
-- `[ ]` App launched with data loaded
-- `[ ]` Help dialog (`?`)
-- `[ ]` Search and filter usage
-- `[ ]` Marked rows (R/A/G)
-- `[ ]` Comment edit and drawer
-- `[ ]` Columns/sort/order commands
-- `[ ]` Time window panel
-- `[ ]` Save + export dialogs

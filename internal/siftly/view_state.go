@@ -47,6 +47,7 @@ type viewState struct {
 	modeHintSeq             int
 	prefixHintSeq           int
 	graphWindow             featuregraph.Window
+	graphHeight             int
 	graphDataVersion        uint64
 	graphCache              graphRenderCache
 	drawerOpen              bool

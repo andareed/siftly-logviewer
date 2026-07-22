@@ -65,6 +65,9 @@ func (m *Model) handleWindowMsg(msg tea.Msg) (tea.Cmd, bool) {
 	}
 	m.terminalHeight = win.Height
 	m.terminalWidth = win.Width
+	if dialog, ok := m.activeDialog.(dialogs.Resizable); ok && m.activeDialog.IsVisible() {
+		dialog.Resize(win.Width, win.Height)
+	}
 	m.viewport = viewport.New(0, 0) // TODO: Pretty sure this is redundant
 	m.ready = true
 	m.refreshView("window-size", true)
@@ -76,7 +79,7 @@ func (m *Model) handleWindowMsg(msg tea.Msg) (tea.Cmd, bool) {
 
 func (m *Model) openHelpDialog() {
 	logging.Infof("Opening Help dialog")
-	m.activeDialog = dialogs.NewHelpDialog(m.commandItems(), m.terminalWidth, m.terminalHeight)
+	m.activeDialog = dialogs.NewHelpDialog(m.commandItems(), m.terminalWidth, m.terminalHeight, m.styles.ResolvedTokens())
 	m.activeDialog.Show()
 }
 
@@ -88,6 +91,7 @@ func (m *Model) openCommandPalette() tea.Cmd {
 		m.terminalHeight,
 		m.styles.RowSelectedFG,
 		m.styles.RowSelectedBG,
+		m.styles.ResolvedTokens(),
 	)
 	m.activeDialog.Show()
 	return m.activeDialog.Init()
@@ -95,13 +99,17 @@ func (m *Model) openCommandPalette() tea.Cmd {
 
 func (m *Model) openSaveDialog() {
 	logging.Infof("Opening Save dialog")
-	m.activeDialog = dialogs.NewSaveDialog(defaultSaveName(*m), defaultDialogDir(*m))
+	dialog := dialogs.NewSaveDialog(defaultSaveName(*m), defaultDialogDir(*m), m.styles.ResolvedTokens())
+	dialog.Resize(m.terminalWidth, m.terminalHeight)
+	m.activeDialog = dialog
 	m.activeDialog.Show()
 }
 
 func (m *Model) openExportDialog() {
 	logging.Infof("Opening filtered data export dialog")
-	m.activeDialog = dialogs.NewExportDialog(defaultExportName(*m), defaultDialogDir(*m))
+	dialog := dialogs.NewExportDialog(defaultExportName(*m), defaultDialogDir(*m), m.styles.ResolvedTokens())
+	dialog.Resize(m.terminalWidth, m.terminalHeight)
+	m.activeDialog = dialog
 	m.activeDialog.Show()
 }
 

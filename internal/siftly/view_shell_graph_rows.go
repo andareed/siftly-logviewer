@@ -9,7 +9,10 @@ import (
 )
 
 func (m *Model) renderGraphBlock(contentW int) string {
-	graphH := m.view.graphWindow.HeightOrDefault()
+	graphH := m.view.graphHeight
+	if graphH < 1 {
+		graphH = m.view.graphWindow.HeightOrDefault()
+	}
 	graphW := contentW - 2
 	if graphW < 0 {
 		graphW = 0
@@ -61,6 +64,7 @@ func (m *Model) renderGraphBlock(contentW int) string {
 			AggregateMode:   aggregate,
 			LayoutMode:      layout,
 			FillMode:        fillMode,
+			Tokens:          m.styles.ResolvedTokens(),
 		})
 		m.view.graphCache = graphRenderCache{
 			valid:       true,

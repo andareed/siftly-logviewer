@@ -1,9 +1,8 @@
 package dialogs
 
 import (
-	"strings"
-
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -11,18 +10,23 @@ import (
 // --- Save dialog (modal) ----------------------------------------------------
 
 type Save struct {
-	input      textinput.Model
-	visible    bool
-	lastDir    string
-	targetPath string
-	targetDir  string
-	fileLines  []string
-	state      fileDialogState
+	input          textinput.Model
+	visible        bool
+	lastDir        string
+	targetPath     string
+	targetDir      string
+	fileLines      []string
+	state          fileDialogState
+	tokens         ui.DesignTokens
+	width          int
+	height         int
+	terminalWidth  int
+	terminalHeight int
 }
 
 func (d Save) Init() tea.Cmd { return d.input.Focus() }
 
-func NewSaveDialog(defaultName, lastDir string) *Save {
+func NewSaveDialog(defaultName, lastDir string, tokenOptions ...ui.DesignTokens) *Save {
 	ti := textinput.New()
 	// Prompt and placeholder
 	ti.Placeholder = defaultName
@@ -33,8 +37,11 @@ func NewSaveDialog(defaultName, lastDir string) *Save {
 	if defaultName != "" {
 		ti.SetValue(defaultName)
 	}
-	d := &Save{input: ti, visible: true, lastDir: lastDir}
+	tokens := dialogDesignTokens(tokenOptions)
+	styleDialogTextInput(&ti, tokens)
+	d := &Save{input: ti, visible: true, lastDir: lastDir, tokens: tokens}
 	d.refreshPreview()
+	d.Resize(82, 29)
 	return d
 }
 
@@ -70,21 +77,9 @@ func (d Save) View() string {
 	if !d.visible {
 		return ""
 	}
-	innerWidth := 78 - 4
-	contentLines := []string{
-		dialogSectionLabel("Filename"),
-		d.input.View(),
-		"",
-		dialogSectionLabel("Location"),
-		d.targetDir,
-		"",
-		dialogSectionLabel("Files in folder"),
-		strings.Join(d.fileLines, "\n"),
-		"",
-		dialogStatusLine(d.state.StatusKind, d.state.StatusMessage),
-		renderDialogActionRowWithKeys(innerWidth, "Enter", d.state.PrimaryAction, d.state.PrimaryEnabled, "Esc", "Cancel"),
-	}
-	return renderDialogPanel("Save Siftly JSON", dialogTopRightState(d.state.TopRightState), 78, contentLines)
+	innerWidth := max(1, d.width-4)
+	contentLines := fileDialogContent(d.input.View(), d.state, innerWidth, d.height, d.tokens)
+	return renderDialogPanel("Save Siftly JSON", dialogTopRightState(d.state.TopRightState, d.tokens), d.width, contentLines, d.tokens)
 }
 
 func (d *Save) Show() {
@@ -101,11 +96,23 @@ func (d *Save) Focus() tea.Cmd { return d.input.Focus() }
 func (d *Save) Blur()          { d.input.Blur() }
 func (d Save) IsVisible() bool { return d.visible }
 
+func (d *Save) Resize(terminalWidth, terminalHeight int) {
+	d.terminalWidth = terminalWidth
+	d.terminalHeight = terminalHeight
+	d.width = responsiveDialogWidth(terminalWidth, preferredFileDialogWidth("Save Siftly JSON", d.input.Value(), d.state), 44)
+	preferredHeight := min(25, 12+len(d.fileLines))
+	d.height = responsiveDialogHeight(terminalHeight, preferredHeight)
+	d.input.Width = max(1, d.width-8)
+}
+
 func (d *Save) refreshPreview() {
 	d.state = resolveFileDialogState(d.lastDir, d.input.Value(), d.input.Placeholder, "Save")
 	d.targetPath = d.state.TargetPath
 	d.targetDir = d.state.TargetDir
 	d.fileLines = d.state.FileLines
+	if d.terminalWidth > 0 {
+		d.Resize(d.terminalWidth, d.terminalHeight)
+	}
 }
 
 // --- App model --------------------------------------------------------------

@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
+	"github.com/charmbracelet/lipgloss"
 )
 
 const dialogFileListLimit = 12
@@ -135,4 +138,51 @@ func resolveFileDialogState(baseDir, input, placeholder, primaryAction string) f
 		st.PrimaryEnabled = false
 		return st
 	}
+}
+
+func preferredFileDialogWidth(title, input string, state fileDialogState) int {
+	innerWidth := max(lipgloss.Width(title), lipgloss.Width(input))
+	for _, value := range append([]string{state.TargetDir, state.StatusMessage}, state.FileLines...) {
+		if width := lipgloss.Width(value); width > innerWidth {
+			innerWidth = width
+		}
+	}
+	return clampDialogWidth(innerWidth+4, 44, 78)
+}
+
+func fileDialogContent(inputView string, state fileDialogState, innerWidth, outerHeight int, tokens ui.DesignTokens) []string {
+	contentLimit := outerHeight - 2
+	if contentLimit < 4 {
+		contentLimit = 4
+	}
+	action := renderDialogActionRowWithKeys(innerWidth, "Enter", state.PrimaryAction, state.PrimaryEnabled, "Esc", "Cancel", tokens)
+	status := dialogStatusLine(state.StatusKind, state.StatusMessage, tokens)
+
+	content := []string{dialogSectionLabel("Filename", tokens), inputView}
+	tail := []string{"", status, action}
+	remaining := contentLimit - len(content) - len(tail)
+	if remaining >= 3 {
+		content = append(content, "", dialogSectionLabel("Location", tokens), state.TargetDir)
+		remaining -= 3
+	}
+	if remaining >= 3 {
+		fileSlots := remaining - 2
+		content = append(content, "", dialogSectionLabel("Files in folder", tokens))
+		content = append(content, fitFileDialogLines(state.FileLines, fileSlots)...)
+	}
+	return append(content, tail...)
+}
+
+func fitFileDialogLines(lines []string, slots int) []string {
+	if slots <= 0 || len(lines) == 0 {
+		return nil
+	}
+	if len(lines) <= slots {
+		return lines
+	}
+	if slots == 1 {
+		return []string{fmt.Sprintf("... %d entries", len(lines))}
+	}
+	visible := append([]string(nil), lines[:slots-1]...)
+	return append(visible, fmt.Sprintf("... %d more", len(lines)-slots+1))
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
@@ -27,7 +28,7 @@ type panelStatusSpec struct {
 }
 
 // renderBoxedPanel renders a fixed-size boxed panel with a status-rich top border.
-func renderBoxedPanel(titleLeft string, status panelStatusSpec, innerLines []string, width, height int) string {
+func renderBoxedPanel(titleLeft string, status panelStatusSpec, innerLines []string, width, height int, tokenOptions ...ui.DesignTokens) string {
 	if width < panelMinOuterCols {
 		width = panelMinOuterCols
 	}
@@ -35,8 +36,9 @@ func renderBoxedPanel(titleLeft string, status panelStatusSpec, innerLines []str
 		height = 2
 	}
 
-	top := renderPanelTopBorder(titleLeft, status, width)
-	bottom := renderPanelBottomBorder(width)
+	tokens := panelDesignTokens(tokenOptions)
+	top := renderPanelTopBorder(titleLeft, status, width, tokens)
+	bottom := renderPanelBottomBorder(width, tokens)
 
 	innerRows := height - 2
 	innerWidth := width - 4
@@ -51,15 +53,17 @@ func renderBoxedPanel(titleLeft string, status panelStatusSpec, innerLines []str
 		if i < len(innerLines) {
 			content = innerLines[i]
 		}
-		lines = append(lines, renderPanelInnerRow(content, innerWidth))
+		lines = append(lines, renderPanelInnerRow(content, innerWidth, tokens))
 	}
 	lines = append(lines, bottom)
 	return strings.Join(lines, "\n")
 }
 
-func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) string {
+func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int, tokenOptions ...ui.DesignTokens) string {
+	tokens := panelDesignTokens(tokenOptions)
+	borderStyle := tokens.Borders.Subtle
 	if width < panelMinOuterCols {
-		return "┌┐"
+		return borderStyle.Render("┌┐")
 	}
 
 	title := strings.TrimSpace(titleLeft)
@@ -103,7 +107,11 @@ func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) s
 		rightW := xansi.StringWidth(right)
 		fillerLen := innerBudget - (leftW + rightW + 4) // spaces around left/filler/right and edges
 		if fillerLen >= 1 {
-			return "┌ " + left + " " + strings.Repeat("─", fillerLen) + " " + right + " ┐"
+			return borderStyle.Render("┌ ") +
+				tokens.Emphasis.Strong.Render(left) +
+				borderStyle.Render(" "+strings.Repeat("─", fillerLen)+" ") +
+				tokens.Emphasis.Muted.Render(right) +
+				borderStyle.Render(" ┐")
 		}
 
 		switch {
@@ -127,7 +135,7 @@ func renderPanelTopBorder(titleLeft string, status panelStatusSpec, width int) s
 			titleLimit = fullTitleLimit
 		default:
 			// Last resort: plain border if terminal is extremely narrow.
-			return "┌" + strings.Repeat("─", width-2) + "┐"
+			return borderStyle.Render("┌" + strings.Repeat("─", width-2) + "┐")
 		}
 	}
 }
@@ -149,23 +157,31 @@ func buildPanelRightStatusWithOverride(current, total int, filter string, includ
 	return strings.Join(parts, "  ")
 }
 
-func renderPanelInnerRow(content string, innerWidth int) string {
+func renderPanelInnerRow(content string, innerWidth int, tokenOptions ...ui.DesignTokens) string {
+	borderStyle := panelDesignTokens(tokenOptions).Borders.Subtle
 	if innerWidth < 1 {
-		return "││"
+		return borderStyle.Render("││")
 	}
 	clipped := xansi.Truncate(content, innerWidth, "")
 	pad := innerWidth - xansi.StringWidth(clipped)
 	if pad < 0 {
 		pad = 0
 	}
-	return "│ " + clipped + strings.Repeat(" ", pad) + " │"
+	return borderStyle.Render("│ ") + clipped + strings.Repeat(" ", pad) + borderStyle.Render(" │")
 }
 
-func renderPanelBottomBorder(width int) string {
+func renderPanelBottomBorder(width int, tokenOptions ...ui.DesignTokens) string {
 	if width < 2 {
 		return ""
 	}
-	return "└" + strings.Repeat("─", width-2) + "┘"
+	return panelDesignTokens(tokenOptions).Borders.Subtle.Render("└" + strings.Repeat("─", width-2) + "┘")
+}
+
+func panelDesignTokens(options []ui.DesignTokens) ui.DesignTokens {
+	if len(options) > 0 {
+		return ui.ResolveDesignTokens(options[0])
+	}
+	return ui.DefaultDesignTokens()
 }
 
 func splitContentLines(s string) []string {

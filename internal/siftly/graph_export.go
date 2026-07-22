@@ -36,6 +36,7 @@ func ExportGraphModel(m *Model, path string) error {
 		AggregateMode:   m.graphConfig.Aggregate,
 		LayoutMode:      m.graphConfig.Layout,
 		FillMode:        m.graphConfig.FillMode,
+		Tokens:          m.styles.ResolvedTokens(),
 	}, featuregraph.ExportOptions{
 		Title: defaultGraphExportTitle(*m),
 	})

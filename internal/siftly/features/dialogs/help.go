@@ -4,14 +4,24 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
 type helpLine struct {
-	category bool
-	text     string
+	category      bool
+	text          string
+	command       CommandItem
+	commandNumber int
+}
+
+type helpColumnWidths struct {
+	shortcut   int
+	title      int
+	detail     int
+	showDetail bool
 }
 
 type Help struct {
@@ -21,31 +31,16 @@ type Help struct {
 	scroll      int
 	width       int
 	visibleRows int
+	tokens      ui.DesignTokens
 }
 
-func NewHelpDialog(items []CommandItem, terminalWidth, terminalHeight int) *Help {
-	width := 84
-	if available := terminalWidth - 4; terminalWidth > 0 && available < width {
-		width = available
-	}
-	if width < 32 {
-		width = 32
-	}
-	visibleRows := terminalHeight - 7
-	if visibleRows < 6 {
-		visibleRows = 6
-	}
-	if visibleRows > 24 {
-		visibleRows = 24
-	}
-
+func NewHelpDialog(items []CommandItem, terminalWidth, terminalHeight int, tokenOptions ...ui.DesignTokens) *Help {
 	d := &Help{
-		visible:     true,
-		items:       append([]CommandItem(nil), items...),
-		width:       width,
-		visibleRows: visibleRows,
+		visible: true,
+		items:   append([]CommandItem(nil), items...),
+		tokens:  dialogDesignTokens(tokenOptions),
 	}
-	d.lines = buildHelpLines(d.items, max(12, width-4))
+	d.Resize(terminalWidth, terminalHeight)
 	return d
 }
 
@@ -82,55 +77,114 @@ func (d Help) View() string {
 	innerWidth := max(12, d.width-4)
 	end := min(len(d.lines), d.scroll+d.visibleRows)
 	visible := make([]string, 0, d.visibleRows)
+	tokens := d.tokens
 	for _, line := range d.lines[d.scroll:end] {
 		if line.category {
-			visible = append(visible, lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render(line.text))
+			visible = append(visible, tokens.States.Accent.Render(strings.ToUpper(line.text)))
+		} else if line.commandNumber > 0 {
+			visible = append(visible, renderHelpCommand(line.command, innerWidth, tokens))
 		} else {
 			visible = append(visible, line.text)
 		}
 	}
-	for len(visible) < d.visibleRows {
-		visible = append(visible, "")
-	}
-
 	position := "No commands"
 	if len(d.lines) > 0 {
-		position = fmt.Sprintf("Lines %d-%d of %d", d.scroll+1, end, len(d.lines))
+		first, last := visibleHelpCommandRange(d.lines[d.scroll:end])
+		if first > 0 {
+			position = fmt.Sprintf("Commands %d-%d of %d", first, last, len(d.items))
+		} else {
+			position = fmt.Sprintf("%d commands", len(d.items))
+		}
 	}
-	content := []string{dialogSectionLabel("Command reference")}
+	content := []string{renderHelpColumnHeader(innerWidth, d.tokens)}
 	content = append(content, visible...)
 	content = append(content,
 		"",
-		dialogStatusLine("", position+"  |  j/k or up/down: scroll  PgUp/PgDn: page"),
-		renderDialogActionRowWithKeys(innerWidth, "Esc", "Close", true, "", ""),
+		dialogStatusLine("", position+"   j/k: move   PgUp/PgDn: page   g/G: first/last", d.tokens),
+		renderDialogActionRowWithKeys(innerWidth, "Esc", "Close", true, "", "", d.tokens),
 	)
 
 	return renderDialogPanel(
-		"Help",
-		dialogTopRightState(fmt.Sprintf("%d commands", len(d.items))),
+		"Keyboard Reference",
+		dialogTopRightState(fmt.Sprintf("%d commands", len(d.items)), d.tokens),
 		d.width,
 		content,
+		d.tokens,
 	)
 }
 
-func buildHelpLines(items []CommandItem, width int) []helpLine {
+func buildHelpLines(items []CommandItem) []helpLine {
 	lines := make([]helpLine, 0, len(items)+12)
 	currentCategory := ""
-	shortcutWidth := min(20, max(10, width/4))
-	for _, item := range items {
+	for i, item := range items {
 		if item.Category != currentCategory {
 			if len(lines) > 0 {
 				lines = append(lines, helpLine{text: ""})
 			}
 			currentCategory = item.Category
-			lines = append(lines, helpLine{category: true, text: strings.ToUpper(currentCategory)})
+			lines = append(lines, helpLine{category: true, text: currentCategory})
 		}
-		shortcut := xansi.Truncate(item.Shortcut, shortcutWidth, "")
-		titleWidth := max(8, width-shortcutWidth-2)
-		title := xansi.Truncate(item.Title, titleWidth, "")
-		lines = append(lines, helpLine{text: padCommandCell(shortcut, shortcutWidth) + "  " + title})
+		lines = append(lines, helpLine{command: item, commandNumber: i + 1})
 	}
 	return lines
+}
+
+func renderHelpColumnHeader(width int, tokens ui.DesignTokens) string {
+	columns := calculateHelpColumnWidths(width)
+	style := tokens.Emphasis.Muted.Copy().Bold(true)
+	line := style.Render(padCommandCell("KEY", columns.shortcut)) + "  " +
+		style.Render(padCommandCell("ACTION", columns.title))
+	if columns.showDetail {
+		line += "  " + style.Render(padCommandCell("DETAIL", columns.detail))
+	}
+	return xansi.Truncate(line, width, "")
+}
+
+func renderHelpCommand(item CommandItem, width int, tokens ui.DesignTokens) string {
+	columns := calculateHelpColumnWidths(width)
+	shortcut := padCommandCell(xansi.Truncate(item.Shortcut, columns.shortcut, ""), columns.shortcut)
+	title := padCommandCell(xansi.Truncate(item.Title, columns.title, "…"), columns.title)
+
+	shortcutStyle := tokens.States.Accent
+	titleStyle := tokens.Emphasis.Normal
+	detailStyle := tokens.Emphasis.Muted
+	if !item.Enabled {
+		shortcutStyle = tokens.Emphasis.Subtle
+		titleStyle = tokens.Emphasis.Subtle
+		detailStyle = tokens.Emphasis.Subtle
+	}
+
+	line := shortcutStyle.Render(shortcut) + "  " + titleStyle.Render(title)
+	if columns.showDetail {
+		detail := padCommandCell(xansi.Truncate(item.Description, columns.detail, "…"), columns.detail)
+		line += "  " + detailStyle.Render(detail)
+	}
+	return xansi.Truncate(line, width, "")
+}
+
+func calculateHelpColumnWidths(width int) helpColumnWidths {
+	if width >= 68 {
+		shortcut := 18
+		detail := max(20, width*2/5)
+		title := width - shortcut - detail - 4
+		return helpColumnWidths{shortcut: shortcut, title: max(8, title), detail: detail, showDetail: true}
+	}
+	shortcut := min(18, max(6, width/4))
+	title := max(1, width-shortcut-2)
+	return helpColumnWidths{shortcut: shortcut, title: title}
+}
+
+func visibleHelpCommandRange(lines []helpLine) (first, last int) {
+	for _, line := range lines {
+		if line.commandNumber == 0 {
+			continue
+		}
+		if first == 0 {
+			first = line.commandNumber
+		}
+		last = line.commandNumber
+	}
+	return first, last
 }
 
 func (d *Help) move(delta int) {
@@ -149,6 +203,27 @@ func (d Help) maxScroll() int {
 		return 0
 	}
 	return maxScroll
+}
+
+func (d *Help) Resize(terminalWidth, terminalHeight int) {
+	d.width = responsiveDialogWidth(terminalWidth, d.preferredWidth(), 40)
+	d.lines = buildHelpLines(d.items)
+	heightLimit := responsiveDialogHeight(terminalHeight, 30)
+	d.visibleRows = boundedListRows(heightLimit, 6, len(d.lines), 24)
+	if d.scroll > d.maxScroll() {
+		d.scroll = d.maxScroll()
+	}
+}
+
+func (d Help) preferredWidth() int {
+	innerWidth := lipgloss.Width("Keyboard Reference")
+	for _, item := range d.items {
+		rowWidth := lipgloss.Width(item.Shortcut) + lipgloss.Width(item.Title) + lipgloss.Width(item.Description) + 4
+		if rowWidth > innerWidth {
+			innerWidth = rowWidth
+		}
+	}
+	return clampDialogWidth(innerWidth+4, 52, 96)
 }
 
 func (d *Help) Show()          { d.visible = true }

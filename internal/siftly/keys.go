@@ -53,11 +53,11 @@ var Keys = Keymap{
 	),
 	MarkMode: key.NewBinding(
 		key.WithKeys("m"),
-		key.WithHelp("m", "Mark mode"),
+		key.WithHelp("m", "Open mark command"),
 	),
 	ShowMarksOnly: key.NewBinding(
 		key.WithKeys("M"),
-		key.WithHelp("M", "Toggle show only marked"),
+		key.WithHelp("M", "Toggle marked rows only"),
 	),
 	NextMark: key.NewBinding(
 		key.WithKeys("]", "ctrl+n"),
@@ -69,15 +69,15 @@ var Keys = Keymap{
 	),
 	CommentOps: key.NewBinding(
 		key.WithKeys("c"),
-		key.WithHelp("c e|v", "Comments ops"),
+		key.WithHelp("c e|v", "Comment actions"),
 	),
 	Filter: key.NewBinding(
 		key.WithKeys("f"),
-		key.WithHelp("f", "Filter by Regex"),
+		key.WithHelp("f", "Filter rows by regex"),
 	),
 	Search: key.NewBinding(
 		key.WithKeys("/"),
-		key.WithHelp("/", "Search"),
+		key.WithHelp("/", "Search displayed rows"),
 	),
 	ToggleFilter: key.NewBinding(
 		key.WithKeys("F"),
@@ -89,7 +89,7 @@ var Keys = Keymap{
 	),
 	SearchPrev: key.NewBinding(
 		key.WithKeys("N"),
-		key.WithHelp("N", "Prev search"),
+		key.WithHelp("N", "Previous search match"),
 	),
 	PageUp: key.NewBinding(
 		key.WithKeys("ctrl+u", "pgup"),
@@ -101,27 +101,27 @@ var Keys = Keymap{
 	),
 	RowDown: key.NewBinding(
 		key.WithKeys("j", "down"),
-		key.WithHelp("j/↓", "Move a row down"),
+		key.WithHelp("j/↓", "Move down one row"),
 	),
 	RowUp: key.NewBinding(
 		key.WithKeys("k", "up"),
-		key.WithHelp("k/↑", "Move a row up"),
+		key.WithHelp("k/↑", "Move up one row"),
 	),
 	CommandPalette: key.NewBinding(
 		key.WithKeys("p"),
-		key.WithHelp("p", "Command palette"),
+		key.WithHelp("p", "Open command palette"),
 	),
 	OpenHelp: key.NewBinding(
 		key.WithKeys("?"),
-		key.WithHelp("?", "Help / keys"),
+		key.WithHelp("?", "Open keyboard reference"),
 	),
 	ScrollLeft: key.NewBinding(
 		key.WithKeys("h", "left"),
-		key.WithHelp("h or <- ", "Scroll the grid left"),
+		key.WithHelp("h/left", "Scroll columns left"),
 	),
 	ScrollRight: key.NewBinding(
 		key.WithKeys("l", "right"),
-		key.WithHelp("l or >- ", "Scroll the grid right"),
+		key.WithHelp("l/right", "Scroll columns right"),
 	),
 	SaveToFile: key.NewBinding(
 		key.WithKeys("s"),
@@ -133,7 +133,7 @@ var Keys = Keymap{
 	),
 	CopyRow: key.NewBinding(
 		key.WithKeys("ctrl+c"),
-		key.WithHelp("ctrl+c", "Copy row/selection"),
+		key.WithHelp("ctrl+c", "Copy current row or selection"),
 	),
 	Undo: key.NewBinding(
 		key.WithKeys("u"),
@@ -169,11 +169,11 @@ var Keys = Keymap{
 	),
 	SelectRange: key.NewBinding(
 		key.WithKeys(" "),
-		key.WithHelp("space", "Start/clear row selection"),
+		key.WithHelp("space", "Start or clear range selection"),
 	),
 	ClearRange: key.NewBinding(
 		key.WithKeys("esc"),
-		key.WithHelp("esc", "Clear row selection"),
+		key.WithHelp("esc", "Clear range selection"),
 	),
 	JumpToStart: key.NewBinding(
 		key.WithKeys("g", "home"),
@@ -185,11 +185,11 @@ var Keys = Keymap{
 	),
 	JumpToLineNo: key.NewBinding(
 		key.WithKeys(":"),
-		key.WithHelp(":", "Jump To line number"),
+		key.WithHelp(":", "Jump to source line"),
 	),
 	TimeOps: key.NewBinding(
 		key.WithKeys("t"),
-		key.WithHelp("t b|e|r|w", "Time ops"),
+		key.WithHelp("t b|e|r|w", "Time-window actions"),
 	),
 	ToggleGraph: key.NewBinding(
 		key.WithKeys("w"),
@@ -197,7 +197,7 @@ var Keys = Keymap{
 	),
 	ReloadFull: key.NewBinding(
 		key.WithKeys("ctrl+r"),
-		key.WithHelp("ctrl+r", "Reload full data"),
+		key.WithHelp("ctrl+r", "Reload full source data"),
 	),
 	ColumnManager: key.NewBinding(
 		key.WithKeys("v"),

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -31,6 +32,7 @@ type ColumnManager struct {
 	visibleRows int
 	selectedFG  lipgloss.Color
 	selectedBG  lipgloss.Color
+	tokens      ui.DesignTokens
 }
 
 func NewColumnManager(
@@ -43,29 +45,15 @@ func NewColumnManager(
 	terminalHeight int,
 	selectedFG lipgloss.Color,
 	selectedBG lipgloss.Color,
+	tokenOptions ...ui.DesignTokens,
 ) *ColumnManager {
-	width := 88
-	if available := terminalWidth - 4; terminalWidth > 0 && available < width {
-		width = available
-	}
-	if width < 42 {
-		width = 42
-	}
-
-	visibleRows := terminalHeight - 13
-	if visibleRows < 5 {
-		visibleRows = 5
-	}
-	if visibleRows > 16 {
-		visibleRows = 16
-	}
-
 	input := textinput.New()
 	input.Prompt = ""
 	input.Placeholder = "Press / to search columns"
 	input.CharLimit = 256
-	input.Width = max(12, width-8)
 	input.Blur()
+	tokens := dialogDesignTokens(tokenOptions)
+	styleDialogTextInput(&input, tokens)
 
 	d := &ColumnManager{
 		visible:     true,
@@ -75,15 +63,15 @@ func NewColumnManager(
 		sortEnabled: sortEnabled,
 		sortColumn:  sortColumn,
 		sortDesc:    sortDesc,
-		width:       width,
-		visibleRows: visibleRows,
 		selectedFG:  selectedFG,
 		selectedBG:  selectedBG,
+		tokens:      tokens,
 	}
 	if len(d.defaults) != len(d.columns) {
 		d.defaults = append([]ColumnManagerItem(nil), d.columns...)
 	}
 	d.rebuildFiltered(-1)
+	d.Resize(terminalWidth, terminalHeight)
 	return d
 }
 
@@ -198,24 +186,25 @@ func (d ColumnManager) View() string {
 	}
 
 	content := []string{
-		dialogSectionLabel("Search"),
+		dialogSectionLabel("Search", d.tokens),
 		d.input.View(),
 		"",
-		dialogStatusLine(statusKind, status),
-		renderDialogActionRowWithKeys(innerWidth, "Enter", "Apply", len(d.columns) > 0, "Esc", "Cancel"),
+		dialogStatusLine(statusKind, status, d.tokens),
+		renderDialogActionRowWithKeys(innerWidth, "Enter", "Apply", len(d.columns) > 0, "Esc", "Cancel", d.tokens),
 		"",
-		dialogSectionLabel("Columns"),
+		dialogSectionLabel("Columns", d.tokens),
 	}
 	content = append(content, d.renderRows(innerWidth)...)
-	content = append(content, "", lipgloss.NewStyle().Faint(true).Render(
+	content = append(content, "", d.tokens.Emphasis.Muted.Render(
 		"Space show/hide   s sort   f freeze   a/A auto-fit   J/K move   r reset   / search",
 	))
 
 	return renderDialogPanel(
 		"Column Manager",
-		dialogTopRightState(fmt.Sprintf("%d columns", len(d.columns))),
+		dialogTopRightState(fmt.Sprintf("%d columns", len(d.columns)), d.tokens),
 		d.width,
 		content,
+		d.tokens,
 	)
 }
 
@@ -402,16 +391,36 @@ func (d *ColumnManager) ensureCursorVisible() {
 }
 
 func (d ColumnManager) renderRows(width int) []string {
-	rows := make([]string, 0, d.visibleRows)
-	end := min(len(d.filtered), d.scroll+d.visibleRows)
+	rowCount := min(len(d.filtered), d.visibleRows)
+	if rowCount <= 0 {
+		return nil
+	}
+	rows := make([]string, 0, rowCount)
+	end := min(len(d.filtered), d.scroll+rowCount)
 	for i := d.scroll; i < end; i++ {
 		columnIndex := d.filtered[i]
 		rows = append(rows, d.renderRow(d.columns[columnIndex], columnIndex, width, i == d.cursor))
 	}
-	for len(rows) < d.visibleRows {
-		rows = append(rows, "")
-	}
 	return rows
+}
+
+func (d *ColumnManager) Resize(terminalWidth, terminalHeight int) {
+	d.width = responsiveDialogWidth(terminalWidth, d.preferredWidth(), 44)
+	d.input.Width = max(1, d.width-8)
+	heightLimit := responsiveDialogHeight(terminalHeight, 27)
+	d.visibleRows = boundedListRows(heightLimit, 11, -1, 16)
+	d.ensureCursorVisible()
+}
+
+func (d ColumnManager) preferredWidth() int {
+	innerWidth := lipgloss.Width("Space show/hide   s sort   f freeze   a/A auto-fit   J/K move   r reset   / search")
+	for _, column := range d.columns {
+		rowWidth := lipgloss.Width(column.Name) + 32
+		if rowWidth > innerWidth {
+			innerWidth = rowWidth
+		}
+	}
+	return clampDialogWidth(innerWidth+4, 44, 88)
 }
 
 func (d ColumnManager) renderRow(column ColumnManagerItem, columnIndex int, width int, selected bool) string {
@@ -448,12 +457,19 @@ func (d ColumnManager) renderRow(column ColumnManagerItem, columnIndex int, widt
 	line := prefix + padCommandCell(name, nameWidth) + "  " + right
 	line = padCommandCell(xansi.Truncate(line, width, ""), width)
 
-	style := lipgloss.NewStyle()
+	tokens := d.tokens
+	style := tokens.Emphasis.Normal
 	if !column.Visible {
-		style = style.Faint(true)
+		style = tokens.Emphasis.Subtle
 	}
 	if selected {
-		style = style.Foreground(d.selectedFG).Background(d.selectedBG)
+		style = tokens.States.Selected
+		if d.selectedFG != "" {
+			style = style.Foreground(d.selectedFG)
+		}
+		if d.selectedBG != "" {
+			style = style.Background(d.selectedBG)
+		}
 	}
 	return style.Render(line)
 }

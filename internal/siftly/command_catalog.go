@@ -92,7 +92,7 @@ func (m *Model) commandCatalog() []paletteCommandSpec {
 	}
 
 	add(commandPaletteOpen, "General", "Open command palette", "p", "Search and run any available command", "commands actions", runeKey('p'))
-	add(commandHelpOpen, "General", "Open categorized help", "?", "Browse every command by category", "keys shortcuts reference", runeKey('?'))
+	add(commandHelpOpen, "General", "Open keyboard reference", "?", "Browse every command and shortcut by category", "keys help shortcuts reference", runeKey('?'))
 	add(commandQuit, "General", "Quit", "q", "Exit Siftly, confirming when changes are unsaved", "close exit", runeKey('q'))
 	add(commandUndo, "History", "Undo last change", "u", "Restore the previous annotation or view state", "history revert", runeKey('u'))
 	add(commandRedo, "History", "Redo last change", "r", "Reapply the most recently undone change", "history restore", runeKey('r'))
@@ -133,10 +133,10 @@ func (m *Model) commandCatalog() []paletteCommandSpec {
 		disable(commandFilterToggle, "No filter configured")
 	}
 
-	add(commandRangeToggle, "Rows and Marks", "Start or clear row selection", "Space", "Anchor a range selection at the current row", "multi select range", runeKey(' '))
-	add(commandRangeClear, "Rows and Marks", "Clear row selection", "Esc", "Remove the active range selection", "deselect", keyType(tea.KeyEsc))
-	add(commandCopyRows, "Rows and Marks", "Copy row or selection", "Ctrl+C", "Copy the current row or selected rows", "clipboard yank", keyType(tea.KeyCtrlC))
-	add(commandMarkOpen, "Rows and Marks", "Open mark command", "m", "Mark the current row, a count, or selected rows", "colour color", runeKey('m'))
+	add(commandRangeToggle, "Rows and Marks", "Start or clear range selection", "Space", "Anchor a displayed-row selection at the current row", "multi select range", runeKey(' '))
+	add(commandRangeClear, "Rows and Marks", "Clear range selection", "Esc", "Remove the active displayed-row selection", "deselect", keyType(tea.KeyEsc))
+	add(commandCopyRows, "Rows and Marks", "Copy current row or selection", "Ctrl+C", "Copy the current row or selected rows", "clipboard yank", keyType(tea.KeyCtrlC))
+	add(commandMarkOpen, "Rows and Marks", "Open mark command", "m [count] r/g/a/c", "Mark selected rows or the current and next count displayed rows", "colour color count", runeKey('m'))
 	add(commandMarkRed, "Rows and Marks", "Mark rows red", "m r", "Apply a red mark to the current row or selection", "colour color", runeKey('m'), runeKey('r'))
 	add(commandMarkGreen, "Rows and Marks", "Mark rows green", "m g", "Apply a green mark to the current row or selection", "colour color", runeKey('m'), runeKey('g'))
 	add(commandMarkAmber, "Rows and Marks", "Mark rows amber", "m a", "Apply an amber mark to the current row or selection", "colour color yellow", runeKey('m'), runeKey('a'))

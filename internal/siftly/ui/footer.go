@@ -36,21 +36,29 @@ type FooterStyles struct {
 }
 
 func DefaultFooterStyles() FooterStyles {
+	return FooterStylesFromTokens(DefaultDesignTokens())
+}
+
+// FooterStylesFromTokens maps the shared semantic palette onto the footer's
+// two-line layout.
+func FooterStylesFromTokens(tokens DesignTokens) FooterStyles {
+	tokens = ResolveDesignTokens(tokens)
+	colors := tokens.Colors
 	return FooterStyles{
-		BarBG:      lipgloss.Color("#202020"),
-		StatusBG:   lipgloss.Color("#101010"),
-		ModeBG:     lipgloss.Color("#3a3a3a"),
-		ModeFG:     lipgloss.Color("#f0f0f0"),
-		ModePillBG: lipgloss.Color("#ff9f1c"),
-		ModePillFG: lipgloss.Color("#000000"),
-		FileNameFG: lipgloss.Color("#e0e0e0"),
-		TextFG:     lipgloss.Color("#cfcfcf"),
-		DimFG:      lipgloss.Color("#a0a0a0"),
-		StatusFG:   lipgloss.Color("#b8b8b8"),
-		SuccessFG:  lipgloss.Color("#72d99c"),
-		WarnFG:     lipgloss.Color("#f0b45a"),
-		ErrorFG:    lipgloss.Color("#ff6b6b"),
-		LegendFG:   lipgloss.Color("#b0b0b0"),
+		BarBG:      colors.SurfaceFooter,
+		StatusBG:   colors.SurfaceFooterInset,
+		ModeBG:     colors.SurfaceSelected,
+		ModeFG:     colors.TextStrong,
+		ModePillBG: colors.Accent,
+		ModePillFG: colors.TextInverse,
+		FileNameFG: colors.TextSelected,
+		TextFG:     colors.Text,
+		DimFG:      colors.TextMuted,
+		StatusFG:   colors.TextMuted,
+		SuccessFG:  colors.Success,
+		WarnFG:     colors.Warning,
+		ErrorFG:    colors.Error,
+		LegendFG:   colors.TextMuted,
 	}
 }
 

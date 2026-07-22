@@ -5,9 +5,10 @@ import (
 	"strings"
 
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
-	"github.com/charmbracelet/lipgloss"
 	xansi "github.com/charmbracelet/x/ansi"
 )
+
+const rowInspectorTitle = "Row Inspector"
 
 func (m *Model) rowInspectorView(panelWidth int) string {
 	if panelWidth < panelMinOuterCols {
@@ -25,7 +26,7 @@ func (m *Model) rowInspectorView(panelWidth int) string {
 
 	innerLines := splitContentLines(m.inspectorPort.View())
 	panelHeight := m.inspectorPort.Height + inspectorChromeRows
-	return renderBoxedPanel("Details", status, innerLines, panelWidth, panelHeight)
+	return renderBoxedPanel(rowInspectorTitle, status, innerLines, panelWidth, panelHeight, m.styles.ResolvedTokens())
 }
 
 func (m *Model) inspectorStatusText(panelWidth int, row Row, fieldPosition int) string {
@@ -41,7 +42,7 @@ func (m *Model) inspectorStatusText(panelWidth int, row Row, fieldPosition int) 
 		fmt.Sprintf("%d/%d  Src %d  F %d/%d  %s", current, total, row.OriginalIndex, fieldPosition, fieldCount, mark),
 		fmt.Sprintf("%d/%d  F %d/%d", current, total, fieldPosition, fieldCount),
 	}
-	budget := panelWidth - xansi.StringWidth("Details") - 8
+	budget := panelWidth - xansi.StringWidth(rowInspectorTitle) - 8
 	for _, candidate := range candidates {
 		if xansi.StringWidth(candidate) <= budget {
 			return candidate
@@ -87,6 +88,7 @@ func (m *Model) buildInspectorContent(row Row, selectedField int, width int) (st
 	}
 
 	lines := make([]string, 0, len(m.table.header)+2)
+	tokens := m.styles.ResolvedTokens()
 	fieldOffsets := make([]int, len(m.table.header))
 	gridColumns := 1
 	const gridGap = 3
@@ -110,7 +112,7 @@ func (m *Model) buildInspectorContent(row Row, selectedField int, width int) (st
 		cells := make([]string, len(pending))
 		for i, field := range pending {
 			fieldOffsets[field.index] = rowOffset
-			cells[i] = renderCompactInspectorField(field.label, field.value, field.index == selectedField)
+			cells[i] = renderCompactInspectorField(field.label, field.value, field.index == selectedField, tokens)
 			if i < len(pending)-1 {
 				cells[i] = padInspectorCell(cells[i], cellWidth)
 			}
@@ -137,7 +139,7 @@ func (m *Model) buildInspectorContent(row Row, selectedField int, width int) (st
 
 		flushPending()
 		fieldOffsets[fieldIndex] = len(lines)
-		lines = append(lines, renderFullWidthInspectorField(label, value, width, fieldIndex == selectedField)...)
+		lines = append(lines, renderFullWidthInspectorField(label, value, width, fieldIndex == selectedField, tokens)...)
 	}
 	flushPending()
 
@@ -145,7 +147,7 @@ func (m *Model) buildInspectorContent(row Row, selectedField int, width int) (st
 		lines = append(lines, "No columns")
 	}
 	if comment := normalizeInspectorText(m.table.commentRows[row.ID]); comment != "" {
-		lines = append(lines, renderFullWidthInspectorField("Comment", comment, width, false)...)
+		lines = append(lines, renderFullWidthInspectorField("Comment", comment, width, false, tokens)...)
 	}
 	return strings.Join(lines, "\n"), fieldOffsets
 }
@@ -166,11 +168,11 @@ func (m *Model) inspectorDesiredContentHeight(width int) int {
 	return height
 }
 
-func renderCompactInspectorField(label, value string, selected bool) string {
-	return renderInspectorLabel(label, selected) + "  " + value
+func renderCompactInspectorField(label, value string, selected bool, tokenOptions ...ui.DesignTokens) string {
+	return renderInspectorLabel(label, selected, tokenOptions...) + "  " + value
 }
 
-func renderFullWidthInspectorField(label, value string, width int, selected bool) []string {
+func renderFullWidthInspectorField(label, value string, width int, selected bool, tokenOptions ...ui.DesignTokens) []string {
 	if width < 1 {
 		width = 1
 	}
@@ -179,19 +181,19 @@ func renderFullWidthInspectorField(label, value string, width int, selected bool
 		labelLines := wrapInspectorText(label, width-2)
 		lines := make([]string, 0, len(labelLines)+1)
 		for i, line := range labelLines {
-			lines = append(lines, renderInspectorLabelPart(line, selected, i == 0))
+			lines = append(lines, renderInspectorLabelPart(line, selected, i == 0, tokenOptions...))
 		}
 		return append(lines, indentInspectorText(value, width, 4)...)
 	}
 
 	valueWidth := width - labelWidth - 2
 	if valueWidth < 12 {
-		return append([]string{renderInspectorLabel(label, selected)}, indentInspectorText(value, width, 4)...)
+		return append([]string{renderInspectorLabel(label, selected, tokenOptions...)}, indentInspectorText(value, width, 4)...)
 	}
 
 	valueLines := wrapInspectorText(value, valueWidth)
 	lines := make([]string, 0, len(valueLines))
-	lines = append(lines, renderInspectorLabel(label, selected)+"  "+valueLines[0])
+	lines = append(lines, renderInspectorLabel(label, selected, tokenOptions...)+"  "+valueLines[0])
 	continuationIndent := strings.Repeat(" ", labelWidth+2)
 	for _, line := range valueLines[1:] {
 		lines = append(lines, continuationIndent+line)
@@ -199,18 +201,19 @@ func renderFullWidthInspectorField(label, value string, width int, selected bool
 	return lines
 }
 
-func renderInspectorLabel(label string, selected bool) string {
-	return renderInspectorLabelPart(label, selected, true)
+func renderInspectorLabel(label string, selected bool, tokenOptions ...ui.DesignTokens) string {
+	return renderInspectorLabelPart(label, selected, true, tokenOptions...)
 }
 
-func renderInspectorLabelPart(label string, selected, firstLine bool) string {
+func renderInspectorLabelPart(label string, selected, firstLine bool, tokenOptions ...ui.DesignTokens) string {
 	prefix := "  "
 	if selected && firstLine {
 		prefix = "› "
 	}
-	style := lipgloss.NewStyle().Bold(true)
+	tokens := panelDesignTokens(tokenOptions)
+	style := tokens.Emphasis.Strong
 	if selected {
-		style = style.Reverse(true)
+		style = tokens.States.Selected.Bold(true)
 	}
 	return style.Render(prefix + label)
 }

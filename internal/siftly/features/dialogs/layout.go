@@ -3,18 +3,21 @@ package dialogs
 import (
 	"strings"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 	xansi "github.com/charmbracelet/x/ansi"
 )
 
-func renderDialogPanel(title string, right string, width int, lines []string) string {
+func renderDialogPanel(title string, right string, width int, lines []string, tokenOptions ...ui.DesignTokens) string {
 	if width < 6 {
 		width = 6
 	}
 
+	tokens := dialogDesignTokens(tokenOptions)
 	innerWidth := width - 4
-	top := renderDialogTopBorder(title, right, width)
-	bottom := "└" + strings.Repeat("─", width-2) + "┘"
+	top := renderDialogTopBorder(title, right, width, tokens)
+	bottom := tokens.Borders.Strong.Render("└" + strings.Repeat("─", width-2) + "┘")
 	flatLines := flattenPanelLines(lines)
 
 	out := make([]string, 0, len(flatLines)+2)
@@ -25,7 +28,11 @@ func renderDialogPanel(title string, right string, width int, lines []string) st
 		if pad < 0 {
 			pad = 0
 		}
-		out = append(out, "│ "+clipped+strings.Repeat(" ", pad)+" │")
+		out = append(out,
+			tokens.Borders.Strong.Render("│ ")+
+				clipped+strings.Repeat(" ", pad)+
+				tokens.Borders.Strong.Render(" │"),
+		)
 	}
 	out = append(out, bottom)
 	return strings.Join(out, "\n")
@@ -46,7 +53,9 @@ func flattenPanelLines(lines []string) []string {
 	return out
 }
 
-func renderDialogTopBorder(title string, right string, width int) string {
+func renderDialogTopBorder(title string, right string, width int, tokenOptions ...ui.DesignTokens) string {
+	tokens := dialogDesignTokens(tokenOptions)
+	borderStyle := tokens.Borders.Strong
 	title = strings.TrimSpace(title)
 	right = strings.TrimSpace(right)
 	if title == "" {
@@ -57,48 +66,46 @@ func renderDialogTopBorder(title string, right string, width int) string {
 	rightW := lipgloss.Width(right)
 	filler := width - 2 - leftW - rightW - 4 // spaces around title and right
 	if filler < 1 {
-		return "┌" + strings.Repeat("─", width-2) + "┐"
+		return borderStyle.Render("┌" + strings.Repeat("─", width-2) + "┐")
 	}
 	if right == "" {
-		return "┌ " + title + " " + strings.Repeat("─", filler+rightW+1) + "┐"
+		return borderStyle.Render("┌ ") +
+			tokens.Emphasis.Strong.Render(title) +
+			borderStyle.Render(" "+strings.Repeat("─", filler+rightW+1)+"┐")
 	}
-	return "┌ " + title + " " + strings.Repeat("─", filler) + " " + right + " ┐"
+	return borderStyle.Render("┌ ") +
+		tokens.Emphasis.Strong.Render(title) +
+		borderStyle.Render(" "+strings.Repeat("─", filler)+" ") +
+		tokens.Emphasis.Muted.Render(right) +
+		borderStyle.Render(" ┐")
 }
 
-func dialogSectionLabel(s string) string {
-	return lipgloss.NewStyle().Faint(true).Render(s)
+func dialogSectionLabel(s string, tokenOptions ...ui.DesignTokens) string {
+	return dialogDesignTokens(tokenOptions).Emphasis.Muted.Render(s)
 }
 
-func dialogStatusLine(kind, msg string) string {
-	switch strings.ToLower(strings.TrimSpace(kind)) {
-	case "success":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render(msg)
-	case "warn":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("214")).Render(msg)
-	case "error":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(msg)
-	default:
-		return msg
-	}
+func dialogStatusLine(kind, msg string, tokenOptions ...ui.DesignTokens) string {
+	return dialogDesignTokens(tokenOptions).NoticeStyle(kind).Render(msg)
 }
 
-func dialogTopRightState(s string) string {
+func dialogTopRightState(s string, tokenOptions ...ui.DesignTokens) string {
 	if strings.TrimSpace(s) == "" {
 		return ""
 	}
-	return lipgloss.NewStyle().Faint(true).Render(strings.ToUpper(strings.TrimSpace(s)))
+	return dialogDesignTokens(tokenOptions).Emphasis.Muted.Render(strings.ToUpper(strings.TrimSpace(s)))
 }
 
-func renderDialogActionRowWithKeys(innerWidth int, primaryKey, primary string, primaryEnabled bool, secondaryKey, secondary string) string {
+func renderDialogActionRowWithKeys(innerWidth int, primaryKey, primary string, primaryEnabled bool, secondaryKey, secondary string, tokenOptions ...ui.DesignTokens) string {
+	tokens := dialogDesignTokens(tokenOptions)
 	primaryLabel := strings.TrimSpace(primary)
 	if strings.TrimSpace(primaryKey) != "" {
 		primaryLabel = strings.TrimSpace(primaryKey) + " " + primaryLabel
 	}
 	primaryText := "[ " + primaryLabel + " ]"
 	if !primaryEnabled {
-		primaryText = lipgloss.NewStyle().Faint(true).Render(primaryText)
+		primaryText = tokens.Emphasis.Subtle.Render(primaryText)
 	} else {
-		primaryText = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214")).Render(primaryText)
+		primaryText = tokens.States.Accent.Render(primaryText)
 	}
 
 	secondaryText := strings.TrimSpace(secondary)
@@ -106,7 +113,7 @@ func renderDialogActionRowWithKeys(innerWidth int, primaryKey, primary string, p
 		secondaryText = strings.TrimSpace(secondaryKey) + " " + secondaryText
 	}
 	if secondaryText != "" {
-		secondaryText = lipgloss.NewStyle().Faint(true).Render(secondaryText)
+		secondaryText = tokens.Emphasis.Muted.Render(secondaryText)
 	}
 
 	row := primaryText
@@ -119,4 +126,23 @@ func renderDialogActionRowWithKeys(innerWidth int, primaryKey, primary string, p
 		return row
 	}
 	return strings.Repeat(" ", pad) + row
+}
+
+func dialogDesignTokens(options []ui.DesignTokens) ui.DesignTokens {
+	if len(options) > 0 {
+		return ui.ResolveDesignTokens(options[0])
+	}
+	return ui.DefaultDesignTokens()
+}
+
+func styleDialogTextInput(input *textinput.Model, tokens ui.DesignTokens) {
+	if input == nil {
+		return
+	}
+	tokens = ui.ResolveDesignTokens(tokens)
+	input.PromptStyle = tokens.Emphasis.Strong
+	input.TextStyle = tokens.Emphasis.Normal
+	input.PlaceholderStyle = tokens.Emphasis.Subtle
+	input.CompletionStyle = tokens.Emphasis.Muted
+	input.Cursor.Style = tokens.States.Accent
 }
