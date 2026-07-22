@@ -60,7 +60,7 @@ func TestCommandCatalogUsesExistingPrefixSequences(t *testing.T) {
 
 	tests := map[string][]string{
 		commandCommentEdit:   {"c", "e"},
-		commandColumns:       {"v", "c"},
+		commandColumns:       {"v"},
 		commandTimeWindow:    {"t", "w"},
 		commandExportData:    {"e", "d"},
 		commandExportGraph:   {"e", "g"},

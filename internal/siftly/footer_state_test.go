@@ -103,7 +103,7 @@ func TestFooterShowsInspectorModeHints(t *testing.T) {
 func TestDefaultFooterAdvertisesCommandPalette(t *testing.T) {
 	m := Model{}
 	got := m.footerHints(false, CmdNone)
-	for _, want := range []string{"p: commands", "?: help", "s/e: output", "u/r: undo/redo"} {
+	for _, want := range []string{"p: commands", "?: help", "v: columns", "s/e: output", "u/r: undo/redo"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("default footer hints missing %q: %q", want, got)
 		}

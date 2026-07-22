@@ -54,7 +54,6 @@ const (
 	commandInspectorScrollDown = "inspector.scroll-down"
 	commandInspectorScrollUp   = "inspector.scroll-up"
 	commandColumns             = "view.columns"
-	commandViewReset           = "view.reset"
 	commandTimeWindow          = "time.window"
 	commandTimeStart           = "time.start"
 	commandTimeEnd             = "time.end"
@@ -176,8 +175,7 @@ func (m *Model) commandCatalog() []paletteCommandSpec {
 		}
 	}
 
-	add(commandColumns, "View and Columns", "Manage columns", "v c / v s / v o", "Search, show, order, sort, freeze, and auto-fit columns", "layout fields ascending descending pin width", runeKey('v'), runeKey('c'))
-	add(commandViewReset, "View and Columns", "Reset view layout", "v r", "Restore default columns, ordering, sorting, and panels", "layout defaults", runeKey('v'), runeKey('r'))
+	add(commandColumns, "View and Columns", "Manage columns", "v", "Search, show, order, sort, freeze, auto-fit, and reset columns", "layout fields ascending descending pin width reset defaults", runeKey('v'))
 
 	add(commandTimeWindow, "Time Window", "Open time window", "t w", "Inspect and adjust the displayed time range", "date range", runeKey('t'), runeKey('w'))
 	add(commandTimeStart, "Time Window", "Set window start from cursor", "t b", "Use the current row timestamp as the window start", "begin date range", runeKey('t'), runeKey('b'))

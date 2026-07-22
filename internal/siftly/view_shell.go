@@ -116,8 +116,6 @@ func (m *Model) footerView(width int) string {
 	}
 	if m.view.mode == modeView && m.view.pendingViewPrefix != "" {
 		switch m.view.pendingViewPrefix {
-		case "v":
-			modeBanner = "VIEW"
 		case "c":
 			modeBanner = "COMMENTS"
 		case "t":

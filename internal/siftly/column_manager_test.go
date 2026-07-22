@@ -103,16 +103,59 @@ func viewportForColumnTest(width int) viewport.Model {
 	return result
 }
 
-func TestColumnManagerAliasesOpenSameDialog(t *testing.T) {
-	for _, alias := range []rune{'c', 's', 'o'} {
-		m := newChangeTrackingTestModel()
-		m.terminalWidth = 100
-		m.terminalHeight = 30
-		_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
-		_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{alias}})
-		if _, ok := m.activeDialog.(*dialogs.ColumnManager); !ok {
-			t.Fatalf("v %c opened %T, want column manager", alias, m.activeDialog)
-		}
+func TestVOpensColumnManagerDirectly(t *testing.T) {
+	m := newChangeTrackingTestModel()
+	m.terminalWidth = 100
+	m.terminalHeight = 30
+	_, _ = m.handleKeyMsg(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	if _, ok := m.activeDialog.(*dialogs.ColumnManager); !ok {
+		t.Fatalf("v opened %T, want column manager", m.activeDialog)
+	}
+	if m.view.pendingViewPrefix != "" {
+		t.Fatalf("v left obsolete prefix %q active", m.view.pendingViewPrefix)
+	}
+}
+
+func TestColumnManagerResetRestoresInitialLayout(t *testing.T) {
+	m, err := NewModelFromRecords([][]string{
+		{"first", "empty"},
+		{"value", ""},
+	}, ColumnSchema{})
+	if err != nil {
+		t.Fatalf("build model: %v", err)
+	}
+	m.InitialiseView()
+	m.applyFilter()
+	m.ready = true
+	m.terminalWidth = 80
+	m.terminalHeight = 24
+	m.recomputeLayout(m.terminalHeight, m.terminalWidth)
+	if m.table.header[1].Visible {
+		t.Fatal("empty source column should be hidden in the initial layout")
+	}
+
+	m.table.header = []ui.ColumnMeta{m.table.header[1], m.table.header[0]}
+	m.table.header[0].Visible = true
+	m.table.header[0].Frozen = true
+	m.table.header[1].Visible = false
+	m.table.header[1].MinWidth = 30
+	m.table.header[1].Weight = 0
+	m.table.sortEnabled = true
+	m.table.sortColumn = 0
+	m.table.sortDesc = true
+
+	_ = m.openColumnManager()
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if got := m.table.header[0]; got.Index != 0 || !got.Visible || got.Frozen || got.MinWidth != 8 || got.Weight != 1 {
+		t.Fatalf("first reset column = %+v", got)
+	}
+	if got := m.table.header[1]; got.Index != 1 || got.Visible || got.Frozen {
+		t.Fatalf("empty reset column = %+v", got)
+	}
+	if m.table.sortEnabled || m.table.sortColumn != -1 || m.table.sortDesc {
+		t.Fatalf("reset retained sort: enabled=%t column=%d desc=%t", m.table.sortEnabled, m.table.sortColumn, m.table.sortDesc)
 	}
 }
 

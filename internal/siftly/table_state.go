@@ -10,6 +10,7 @@ import (
 
 type tableState struct {
 	header          []ui.ColumnMeta // single row for column titles in headerview
+	defaultHeader   []ui.ColumnMeta
 	rows            []Row
 	markedRows      map[uint64]ui.MarkColor // map row index to color code
 	commentRows     map[uint64]string       // map row index to string to store comments

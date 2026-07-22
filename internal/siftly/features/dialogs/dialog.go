@@ -44,6 +44,7 @@ type ColumnManagerItem struct {
 	Visible     bool
 	Frozen      bool
 	MinWidth    int
+	Weight      float64
 	AutoFit     bool
 }
 

@@ -30,7 +30,7 @@ func TestCommandPaletteFiltersAcrossCommandMetadata(t *testing.T) {
 func TestCommandPaletteRanksCategoryAndTitleMatchesFirst(t *testing.T) {
 	d := NewCommandPalette([]CommandItem{
 		{ID: "navigation.left", Category: "Navigation", Title: "Scroll columns left", Description: "Move the table viewport", Shortcut: "h", Enabled: true},
-		{ID: "view.columns", Category: "View and Columns", Title: "Choose visible columns", Shortcut: "v c", Enabled: true},
+		{ID: "view.columns", Category: "View and Columns", Title: "Choose visible columns", Shortcut: "v", Enabled: true},
 	}, 100, 30, lipgloss.Color("15"), lipgloss.Color("8"))
 	d.Show()
 

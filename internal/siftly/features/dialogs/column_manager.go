@@ -15,6 +15,7 @@ type ColumnManager struct {
 	input   textinput.Model
 
 	columns  []ColumnManagerItem
+	defaults []ColumnManagerItem
 	filtered []int
 	cursor   int
 	scroll   int
@@ -34,6 +35,7 @@ type ColumnManager struct {
 
 func NewColumnManager(
 	columns []ColumnManagerItem,
+	defaults []ColumnManagerItem,
 	sortEnabled bool,
 	sortColumn int,
 	sortDesc bool,
@@ -69,6 +71,7 @@ func NewColumnManager(
 		visible:     true,
 		input:       input,
 		columns:     append([]ColumnManagerItem(nil), columns...),
+		defaults:    append([]ColumnManagerItem(nil), defaults...),
 		sortEnabled: sortEnabled,
 		sortColumn:  sortColumn,
 		sortDesc:    sortDesc,
@@ -76,6 +79,9 @@ func NewColumnManager(
 		visibleRows: visibleRows,
 		selectedFG:  selectedFG,
 		selectedBG:  selectedBG,
+	}
+	if len(d.defaults) != len(d.columns) {
+		d.defaults = append([]ColumnManagerItem(nil), d.columns...)
 	}
 	d.rebuildFiltered(-1)
 	return d
@@ -163,6 +169,8 @@ func (d *ColumnManager) updateList(msg tea.KeyMsg) (Dialog, Action, tea.Cmd) {
 		d.queueAutoFit(false)
 	case "A":
 		d.queueAutoFit(true)
+	case "r":
+		d.resetDraft()
 	case "tab":
 		d.searchFocus = true
 		return d, Action{Kind: ActionNone}, d.input.Focus()
@@ -200,7 +208,7 @@ func (d ColumnManager) View() string {
 	}
 	content = append(content, d.renderRows(innerWidth)...)
 	content = append(content, "", lipgloss.NewStyle().Faint(true).Render(
-		"Space show/hide   s sort   f freeze   a/A fit one/all   J/K move   / search",
+		"Space show/hide   s sort   f freeze   a/A auto-fit   J/K move   r reset   / search",
 	))
 
 	return renderDialogPanel(
@@ -292,6 +300,22 @@ func (d *ColumnManager) queueAutoFit(all bool) {
 	}
 	d.columns[index].AutoFit = true
 	d.setStatus("", "Auto-fit queued for "+d.columns[index].Name)
+}
+
+func (d *ColumnManager) resetDraft() {
+	selectedSource := d.selectedSourceIndex()
+	d.columns = append(d.columns[:0], d.defaults...)
+	for i := range d.columns {
+		d.columns[i].AutoFit = false
+	}
+	d.sortEnabled = false
+	d.sortColumn = -1
+	d.sortDesc = false
+	d.input.SetValue("")
+	d.input.Blur()
+	d.searchFocus = false
+	d.rebuildFiltered(selectedSource)
+	d.setStatus("", "Layout reset queued; Enter to apply or Esc to cancel")
 }
 
 func (d *ColumnManager) reorderSelected(delta int) {

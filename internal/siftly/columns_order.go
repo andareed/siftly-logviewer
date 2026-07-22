@@ -2,12 +2,10 @@ package siftly
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 // reorderColumnsBySpec reorders table columns according to spec.
@@ -95,32 +93,4 @@ func (m *Model) currentColumnOrderSeed() string {
 		parts = append(parts, name)
 	}
 	return strings.Join(parts, ", ")
-}
-
-func (m *Model) resetViewLayoutState() tea.Cmd {
-	layoutChanged := m.table.sortEnabled
-	for position, col := range m.table.header {
-		if !col.Visible || col.Frozen || col.Index != position {
-			layoutChanged = true
-			break
-		}
-	}
-	sort.SliceStable(m.table.header, func(i, j int) bool {
-		return m.table.header[i].Index < m.table.header[j].Index
-	})
-	for i := range m.table.header {
-		m.table.header[i].Visible = true
-		m.table.header[i].Frozen = false
-	}
-	m.table.sortEnabled = false
-	m.table.sortColumn = -1
-	m.table.sortDesc = false
-	m.rebuildRowOrder()
-	m.applyFilter()
-	m.view.columnScrollOffset = 0
-	if layoutChanged {
-		m.recordChange("reset view")
-	}
-	m.refreshView("reset-view-layout", true)
-	return m.view.notice.Start("Reset view: visibility, freeze, sort, order", "", noticeDuration)
 }

@@ -49,8 +49,6 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 
 	if prefix := strings.TrimSpace(m.view.pendingViewPrefix); prefix != "" {
 		switch prefix {
-		case "v":
-			return "c/s/o: column manager   r: reset   esc: cancel"
 		case "c":
 			return "e: edit comment   v: toggle drawer   esc: cancel"
 		case "t":
@@ -69,7 +67,7 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 		return "j/k: extend   ctrl+c: copy   m: mark   space/esc: clear   ?: help"
 	}
 
-	hints := "j/k: navigate   p: commands   ?: help   f: filter   /: search   space: select   s/e: output   u/r: undo/redo"
+	hints := "j/k: move  p: commands  ?: help  v: columns  f: filter  /: search  space: select  s/e: output  u/r: undo/redo"
 	if m.graphConfig.Enabled {
 		hints += "   w: graph"
 	}

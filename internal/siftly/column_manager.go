@@ -17,20 +17,13 @@ const (
 )
 
 func (m *Model) openColumnManager() tea.Cmd {
-	items := make([]dialogs.ColumnManagerItem, len(m.table.header))
-	for i, column := range m.table.header {
-		items[i] = dialogs.ColumnManagerItem{
-			SourceIndex: column.Index,
-			Name:        column.Name,
-			Visible:     column.Visible,
-			Frozen:      column.Frozen,
-			MinWidth:    column.MinWidth,
-		}
-	}
+	items := columnManagerItems(m.table.header)
+	defaults := columnManagerItems(m.table.defaultHeader)
 
 	logging.Infof("Opening column manager")
 	m.activeDialog = dialogs.NewColumnManager(
 		items,
+		defaults,
 		m.table.sortEnabled,
 		m.table.sortColumn,
 		m.table.sortDesc,
@@ -41,6 +34,28 @@ func (m *Model) openColumnManager() tea.Cmd {
 	)
 	m.activeDialog.Show()
 	return m.activeDialog.Init()
+}
+
+func (m *Model) captureDefaultColumnLayout() {
+	if len(m.table.defaultHeader) == len(m.table.header) && len(m.table.defaultHeader) > 0 {
+		return
+	}
+	m.table.defaultHeader = append([]ui.ColumnMeta(nil), m.table.header...)
+}
+
+func columnManagerItems(columns []ui.ColumnMeta) []dialogs.ColumnManagerItem {
+	items := make([]dialogs.ColumnManagerItem, len(columns))
+	for i, column := range columns {
+		items[i] = dialogs.ColumnManagerItem{
+			SourceIndex: column.Index,
+			Name:        column.Name,
+			Visible:     column.Visible,
+			Frozen:      column.Frozen,
+			MinWidth:    column.MinWidth,
+			Weight:      column.Weight,
+		}
+	}
+	return items
 }
 
 func (m *Model) applyColumnManagerResult(result dialogs.ColumnManagerResult) error {
@@ -71,6 +86,10 @@ func (m *Model) applyColumnManagerResult(result dialogs.ColumnManagerResult) err
 
 		column.Visible = item.Visible
 		column.Frozen = item.Visible && item.Frozen
+		if item.MinWidth > 0 {
+			column.MinWidth = item.MinWidth
+			column.Weight = item.Weight
+		}
 		if item.AutoFit {
 			sorted := result.SortEnabled && result.SortColumn == column.Index
 			column.MinWidth = m.autoFitColumnWidth(column, sorted)

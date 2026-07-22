@@ -43,7 +43,7 @@ type Keymap struct {
 	JumpToLineNo        key.Binding
 	ToggleGraph         key.Binding
 	ReloadFull          key.Binding
-	ColumnViewOps       key.Binding
+	ColumnManager       key.Binding
 }
 
 var Keys = Keymap{
@@ -199,8 +199,8 @@ var Keys = Keymap{
 		key.WithKeys("ctrl+r"),
 		key.WithHelp("ctrl+r", "Reload full data"),
 	),
-	ColumnViewOps: key.NewBinding(
+	ColumnManager: key.NewBinding(
 		key.WithKeys("v"),
-		key.WithHelp("v c|s|o|r", "Columns/Sort/View ops"),
+		key.WithHelp("v", "Manage columns"),
 	),
 }

@@ -14,7 +14,7 @@ type viewAction int
 
 const (
 	viewActionNone viewAction = iota
-	viewActionPrefixView
+	viewActionOpenColumnManager
 	viewActionPrefixComment
 	viewActionPrefixTime
 	viewActionPrefixExport
@@ -65,10 +65,6 @@ type viewPrefixAction int
 
 const (
 	viewPrefixActionNone viewPrefixAction = iota
-	viewPrefixActionColumns
-	viewPrefixActionSort
-	viewPrefixActionColumnOrder
-	viewPrefixActionResetLayout
 	viewPrefixActionCommentEdit
 	viewPrefixActionCommentToggleDrawer
 	viewPrefixActionTimeWindowOpen
@@ -121,11 +117,8 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch action {
-	case viewActionPrefixView:
-		m.view.pendingViewPrefix = "v"
-		m.setPrefixHint("c: columns   s: sort   o: order   r: reset   esc: cancel")
-		cmd = nil
-		return m, cmd
+	case viewActionOpenColumnManager:
+		return m, m.openColumnManager()
 	case viewActionPrefixComment:
 		m.view.pendingViewPrefix = "c"
 		m.setPrefixHint("e: edit comment   v: toggle drawer   esc: cancel")
@@ -281,8 +274,8 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 	switch {
-	case key.Matches(msg, Keys.ColumnViewOps):
-		return viewActionPrefixView
+	case key.Matches(msg, Keys.ColumnManager):
+		return viewActionOpenColumnManager
 	case key.Matches(msg, Keys.CommentOps):
 		return viewActionPrefixComment
 	case key.Matches(msg, Keys.TimeOps):
@@ -413,14 +406,6 @@ func (m *Model) handleViewPrefixKey(msg tea.KeyMsg) (handled bool, cmd tea.Cmd, 
 	}()
 
 	switch m.resolveViewPrefixAction(msg) {
-	case viewPrefixActionColumns:
-		return true, m.openColumnManager(), false
-	case viewPrefixActionSort:
-		return true, m.openColumnManager(), false
-	case viewPrefixActionColumnOrder:
-		return true, m.openColumnManager(), false
-	case viewPrefixActionResetLayout:
-		return true, m.resetViewLayoutState(), true
 	case viewPrefixActionCommentEdit:
 		return true, m.enterCommand(CmdComment, "", true, false), false
 	case viewPrefixActionCommentToggleDrawer:
@@ -458,14 +443,6 @@ func (m *Model) resolveViewPrefixAction(msg tea.KeyMsg) viewPrefixAction {
 	switch {
 	case keyStr == "esc":
 		return viewPrefixActionCancel
-	case m.view.pendingViewPrefix == "v" && keyStr == "c":
-		return viewPrefixActionColumns
-	case m.view.pendingViewPrefix == "v" && keyStr == "s":
-		return viewPrefixActionSort
-	case m.view.pendingViewPrefix == "v" && keyStr == "o":
-		return viewPrefixActionColumnOrder
-	case m.view.pendingViewPrefix == "v" && keyStr == "r":
-		return viewPrefixActionResetLayout
 	case m.view.pendingViewPrefix == "c" && keyStr == "e":
 		return viewPrefixActionCommentEdit
 	case m.view.pendingViewPrefix == "c" && keyStr == "v":

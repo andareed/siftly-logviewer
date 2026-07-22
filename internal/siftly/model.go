@@ -66,6 +66,7 @@ func (m *Model) SetGraphConfig(cfg GraphConfig) {
 
 func (m *Model) InitialiseView() {
 	m.ensureTableDerivedState()
+	m.captureDefaultColumnLayout()
 	m.clearRowRangeSelection()
 	m.table.showOnlyMarked = false
 	m.drawerPort = viewport.New(0, 0)
