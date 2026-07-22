@@ -67,6 +67,35 @@ func TestRowInspectorIncludesCompleteRowMetadataAndReorderedFields(t *testing.T)
 	}
 }
 
+func TestDenseTableSummaryDoesNotAlterInspectorContent(t *testing.T) {
+	const fullValue = "first line\nsecond line with complete diagnostic detail"
+	row := Row{ID: 52, Cols: []string{fullValue}, OriginalIndex: 8}
+	column := ui.ColumnMeta{Name: "message", Index: 0, Visible: true, Width: 16}
+
+	tableRow, height := ui.RenderRow(ui.RowRenderInput{
+		Cols:          row.Cols,
+		OriginalIndex: row.OriginalIndex,
+		TotalRows:     1,
+		ColsMeta:      []ui.ColumnMeta{column},
+		ContentWidth:  16,
+		Styles: ui.RowStyles{
+			Cell:          lipgloss.NewStyle().Padding(0, 1),
+			DefaultMarker: " ",
+		},
+	})
+	if height != 1 || strings.Count(tableRow, "\n") != 0 || !strings.Contains(tableRow, "↵") || !strings.Contains(tableRow, "…") {
+		t.Fatalf("table row is not a one-line summary: height=%d row=%q", height, tableRow)
+	}
+
+	m := Model{table: tableState{header: []ui.ColumnMeta{column}}}
+	inspector, _ := m.buildInspectorContent(row, 0, 30)
+	plain := stripANSI(inspector)
+	normalized := strings.Join(strings.Fields(plain), " ")
+	if !strings.Contains(normalized, "first line") || !strings.Contains(normalized, "second line with complete diagnostic detail") {
+		t.Fatalf("inspector lost full multiline content:\n%s", plain)
+	}
+}
+
 func TestRowInspectorFieldNavigationWrapsAndMovesViewport(t *testing.T) {
 	m := inspectorTestModel()
 	m.inspectorPort = viewport.New(32, 1)

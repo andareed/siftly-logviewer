@@ -14,16 +14,16 @@ type ColumnMeta = ui.ColumnMeta
 
 const (
 	RoleNormal    = ui.RoleNormal
-	RolePrimary   = ui.RolePrimary // Details/value
+	RolePrimary   = ui.RolePrimary // Key
 	RoleSecondary = ui.RoleSecondary
 )
 
 func detectRole(name string) ColumnRole {
 	n := strings.ToLower(strings.TrimSpace(name))
 	switch n {
-	case "value":
+	case "key":
 		return RolePrimary
-	case "key", "process", "date":
+	case "value", "process", "date":
 		return RoleSecondary
 	default:
 		return RoleNormal
@@ -33,7 +33,7 @@ func detectRole(name string) ColumnRole {
 func defaultMinWidthForRole(r ColumnRole) int {
 	switch r {
 	case RolePrimary:
-		return 50
+		return 40
 	case RoleSecondary:
 		return 12
 	default:
@@ -44,7 +44,7 @@ func defaultMinWidthForRole(r ColumnRole) int {
 func defaultWeightForRole(r ColumnRole) float64 {
 	switch r {
 	case RolePrimary:
-		return 5.0
+		return 6.0
 	case RoleSecondary:
 		return 2.0
 	default:
@@ -60,8 +60,8 @@ func todaylogColumnSchema() siftly.ColumnSchema {
 		TimeParser:      parseTodaylogUnixSeconds,
 		RoleDefaults: map[ui.ColumnRole]siftly.RoleLayout{
 			RolePrimary: {
-				MinWidth: 50,
-				Weight:   5.0,
+				MinWidth: 40,
+				Weight:   6.0,
 			},
 			RoleSecondary: {
 				MinWidth: 12,
@@ -70,28 +70,28 @@ func todaylogColumnSchema() siftly.ColumnSchema {
 		},
 		ColumnDefaults: map[string]siftly.RoleLayout{
 			"date": {
-				MinWidth: 19,
-				Weight:   2.0,
+				MinWidth: 17,
+				Weight:   1.0,
 			},
 			"timestamp": {
-				MinWidth: 16,
-				Weight:   1.0,
+				MinWidth: 12,
+				Weight:   0.5,
 			},
 			"pid": {
-				MinWidth: 8,
-				Weight:   1.0,
+				MinWidth: 7,
+				Weight:   0.5,
 			},
 			"process": {
-				MinWidth: 24,
-				Weight:   2.0,
+				MinWidth: 12,
+				Weight:   1.0,
 			},
 			"key": {
-				MinWidth: 24,
-				Weight:   3.0,
+				MinWidth: 40,
+				Weight:   6.0,
 			},
 			"value": {
-				MinWidth: 60,
-				Weight:   6.0,
+				MinWidth: 12,
+				Weight:   3.0,
 			},
 		},
 	}

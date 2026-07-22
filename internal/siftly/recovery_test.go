@@ -23,6 +23,8 @@ func TestRecoverySnapshotRestoresOnlyAgainstIdenticalSource(t *testing.T) {
 	m.markCurrent(ui.MarkRed)
 	m.addComment("needs investigation")
 	_ = runColumnOrderCommand(m, "second, first")
+	m.table.header[0].Frozen = true
+	m.recordChange("freeze column")
 	if err := m.setSortSpec("second desc"); err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +56,9 @@ func TestRecoverySnapshotRestoresOnlyAgainstIdenticalSource(t *testing.T) {
 	}
 	if got := reopened.table.header[0].Name; got != "second" {
 		t.Fatalf("column order was not recovered: first column=%q", got)
+	}
+	if !reopened.table.header[0].Frozen {
+		t.Fatal("frozen column state was not recovered")
 	}
 
 	if err := os.WriteFile(sourcePath, []byte("first,second\nbackend-changed,999\n"), 0o600); err != nil {

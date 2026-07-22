@@ -39,8 +39,11 @@ type timeWindowDTO struct {
 type compactColumnLayout struct {
 	Role     ui.ColumnRole
 	Visible  bool
+	Frozen   bool
 	MinWidth int
 	Weight   float64
+	Index    int
+	hasIndex bool
 }
 
 type metaOnlyDTO struct {
@@ -132,7 +135,7 @@ func ExportModel(m *Model, path string) error {
 	w := csv.NewWriter(f)
 	defer w.Flush()
 
-	// Build header: original columns + Mark + Comment
+	// Build header: current column order + Mark + Comment
 	header := make([]string, 0, len(m.table.header)+2)
 	for _, col := range m.table.header {
 		header = append(header, col.Name)
@@ -161,8 +164,13 @@ func ExportModel(m *Model, path string) error {
 		}
 		r := m.table.rows[idx]
 
-		// row data: original cols
-		out := append([]string(nil), r.Cols...)
+		// Row values follow the current display order while source indices remain stable.
+		out := make([]string, len(m.table.header), len(m.table.header)+2)
+		for columnIndex, column := range m.table.header {
+			if column.Index >= 0 && column.Index < len(r.Cols) {
+				out[columnIndex] = r.Cols[column.Index]
+			}
+		}
 
 		// append mark + comment using the row's id
 		mark := ""
@@ -328,15 +336,18 @@ func snapshotColumnLayouts(header []ui.ColumnMeta) []compactColumnLayout {
 		layouts[i] = compactColumnLayout{
 			Role:     col.Role,
 			Visible:  col.Visible,
+			Frozen:   col.Frozen,
 			MinWidth: col.MinWidth,
 			Weight:   col.Weight,
+			Index:    col.Index,
+			hasIndex: true,
 		}
 	}
 	return layouts
 }
 
 func (l compactColumnLayout) MarshalJSON() ([]byte, error) {
-	return json.Marshal([]any{int(l.Role), l.Visible, l.MinWidth, l.Weight})
+	return json.Marshal([]any{int(l.Role), l.Visible, l.MinWidth, l.Weight, l.Frozen, l.Index})
 }
 
 func (l *compactColumnLayout) UnmarshalJSON(data []byte) error {
@@ -344,8 +355,8 @@ func (l *compactColumnLayout) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &values); err != nil {
 		return err
 	}
-	if len(values) != 4 {
-		return fmt.Errorf("column layout has %d values, want 4", len(values))
+	if len(values) < 4 || len(values) > 6 {
+		return fmt.Errorf("column layout has %d values, want 4 to 6", len(values))
 	}
 	var role int
 	if err := json.Unmarshal(values[0], &role); err != nil {
@@ -363,11 +374,27 @@ func (l *compactColumnLayout) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(values[3], &weight); err != nil {
 		return fmt.Errorf("weight: %w", err)
 	}
+	frozen := false
+	if len(values) >= 5 {
+		if err := json.Unmarshal(values[4], &frozen); err != nil {
+			return fmt.Errorf("frozen: %w", err)
+		}
+	}
+	index := 0
+	hasIndex := len(values) >= 6
+	if hasIndex {
+		if err := json.Unmarshal(values[5], &index); err != nil {
+			return fmt.Errorf("index: %w", err)
+		}
+	}
 	*l = compactColumnLayout{
 		Role:     ui.ColumnRole(role),
 		Visible:  visible,
+		Frozen:   frozen,
 		MinWidth: minWidth,
 		Weight:   weight,
+		Index:    index,
+		hasIndex: hasIndex,
 	}
 	return nil
 }
@@ -545,11 +572,25 @@ func applyColumnLayouts(header []ui.ColumnMeta, layouts []compactColumnLayout) e
 	}
 	for i, layout := range layouts {
 		header[i].Index = i
+		if layout.hasIndex {
+			header[i].Index = layout.Index
+		}
 		header[i].Role = layout.Role
 		header[i].Visible = layout.Visible
+		header[i].Frozen = layout.Frozen
 		header[i].MinWidth = layout.MinWidth
 		header[i].Weight = layout.Weight
 		header[i].Width = 0
+	}
+	seen := make(map[int]struct{}, len(header))
+	for _, column := range header {
+		if column.Index < 0 || column.Index >= len(header) {
+			return fmt.Errorf("column source index %d out of range", column.Index)
+		}
+		if _, duplicate := seen[column.Index]; duplicate {
+			return fmt.Errorf("duplicate column source index %d", column.Index)
+		}
+		seen[column.Index] = struct{}{}
 	}
 	return nil
 }

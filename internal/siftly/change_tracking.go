@@ -19,6 +19,7 @@ type trackedColumn struct {
 	Index    int
 	Role     ui.ColumnRole
 	Visible  bool
+	Frozen   bool
 	MinWidth int
 	Weight   float64
 }
@@ -78,6 +79,7 @@ func (m *Model) captureTrackedState() trackedState {
 			Index:    column.Index,
 			Role:     column.Role,
 			Visible:  column.Visible,
+			Frozen:   column.Frozen,
 			MinWidth: column.MinWidth,
 			Weight:   column.Weight,
 		}
@@ -179,6 +181,7 @@ func (m *Model) redoLastChange() tea.Cmd {
 
 func (m *Model) restoreTrackedState(state trackedState, refresh bool) {
 	currentRowID := m.currentRowHashID()
+	m.view.columnScrollOffset = 0
 	m.table.header = make([]ui.ColumnMeta, len(state.Columns))
 	for i, column := range state.Columns {
 		m.table.header[i] = ui.ColumnMeta{
@@ -186,6 +189,7 @@ func (m *Model) restoreTrackedState(state trackedState, refresh bool) {
 			Index:    column.Index,
 			Role:     column.Role,
 			Visible:  column.Visible,
+			Frozen:   column.Frozen,
 			MinWidth: column.MinWidth,
 			Weight:   column.Weight,
 		}

@@ -57,6 +57,7 @@ type viewState struct {
 	searchQuery             string
 	searchIndex             searchIndexState
 	lastColumnsSpec         string
+	columnScrollOffset      int
 	pendingViewPrefix       string
 	visibleStart            int
 	visibleEnd              int

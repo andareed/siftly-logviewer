@@ -5,7 +5,31 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
 )
+
+func TestGraphColumnIndicesFollowStableSourcesAfterReorder(t *testing.T) {
+	m, err := NewModelFromRecords([][]string{
+		{"timestamp", "key", "value"},
+		{"1713878400", "metric.a", "10"},
+	}, ColumnSchema{})
+	if err != nil {
+		t.Fatalf("build model: %v", err)
+	}
+	m.SetGraphConfig(GraphConfig{
+		Enabled:      true,
+		TimeColumn:   "timestamp",
+		SeriesColumn: "key",
+		ValueColumn:  "value",
+	})
+	m.table.header = []ui.ColumnMeta{m.table.header[2], m.table.header[0], m.table.header[1]}
+
+	timeColumn, seriesColumn, valueColumn, ok := m.graphColumnIndices()
+	if !ok || timeColumn != 0 || seriesColumn != 1 || valueColumn != 2 {
+		t.Fatalf("graph source columns = (%d,%d,%d,%t)", timeColumn, seriesColumn, valueColumn, ok)
+	}
+}
 
 func TestExportGraphModelWritesSVGForFilteredRows(t *testing.T) {
 	t.Parallel()

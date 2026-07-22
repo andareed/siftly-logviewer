@@ -1,6 +1,7 @@
 package siftly
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -82,6 +83,65 @@ func TestSaveModelUsesCompactRowsAndReloadsIDs(t *testing.T) {
 	}
 	if !reopened.table.timeWindow.Enabled {
 		t.Fatalf("time window should reload as enabled")
+	}
+}
+
+func TestSaveModelPreservesReorderedFrozenColumnSourceIndices(t *testing.T) {
+	t.Parallel()
+
+	m, err := NewModelFromRecords([][]string{
+		{"first", "second", "third"},
+		{"A", "B", "C"},
+	}, ColumnSchema{})
+	if err != nil {
+		t.Fatalf("build model: %v", err)
+	}
+	m.table.header = []ui.ColumnMeta{m.table.header[2], m.table.header[0], m.table.header[1]}
+	m.table.header[0].Frozen = true
+	m.table.header[1].Visible = false
+
+	path := filepath.Join(t.TempDir(), "reordered.json")
+	if err := SaveModel(m, path); err != nil {
+		t.Fatalf("SaveModel: %v", err)
+	}
+
+	var reopened Model
+	if err := LoadModel(&reopened, path); err != nil {
+		t.Fatalf("LoadModel: %v", err)
+	}
+	if got := reopened.table.header[0]; got.Name != "third" || got.Index != 2 || !got.Frozen {
+		t.Fatalf("reopened first column = %+v", got)
+	}
+	if got := reopened.table.header[1]; got.Name != "first" || got.Index != 0 || got.Visible {
+		t.Fatalf("reopened second column = %+v", got)
+	}
+	if got := reopened.table.rows[0].Cols; len(got) != 3 || got[2] != "C" {
+		t.Fatalf("source row changed on reload: %v", got)
+	}
+}
+
+func TestCompactColumnLayoutAcceptsLegacyFourValueForm(t *testing.T) {
+	t.Parallel()
+
+	var layout compactColumnLayout
+	if err := json.Unmarshal([]byte(`[0,true,8,1]`), &layout); err != nil {
+		t.Fatalf("decode legacy column layout: %v", err)
+	}
+	if layout.Frozen || layout.hasIndex || layout.MinWidth != 8 || layout.Weight != 1 {
+		t.Fatalf("legacy column layout = %+v", layout)
+	}
+}
+
+func TestApplyColumnLayoutsRejectsDuplicateSourceIndices(t *testing.T) {
+	t.Parallel()
+
+	header := []ui.ColumnMeta{{Name: "first"}, {Name: "second"}}
+	layouts := []compactColumnLayout{
+		{Visible: true, MinWidth: 8, Weight: 1, Index: 0, hasIndex: true},
+		{Visible: true, MinWidth: 8, Weight: 1, Index: 0, hasIndex: true},
+	}
+	if err := applyColumnLayouts(header, layouts); err == nil {
+		t.Fatal("duplicate source indices should be rejected")
 	}
 }
 

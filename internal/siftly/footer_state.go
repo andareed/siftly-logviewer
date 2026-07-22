@@ -50,7 +50,7 @@ func (m *Model) footerHints(inputMode bool, command Command) string {
 	if prefix := strings.TrimSpace(m.view.pendingViewPrefix); prefix != "" {
 		switch prefix {
 		case "v":
-			return "c: columns   s: sort   o: order   r: reset   esc: cancel"
+			return "c/s/o: column manager   r: reset   esc: cancel"
 		case "c":
 			return "e: edit comment   v: toggle drawer   esc: cancel"
 		case "t":

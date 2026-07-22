@@ -15,35 +15,33 @@ func (m *Model) headerView() string {
 }
 
 func (m *Model) panelHeaderView() string {
-	return m.renderHeaderLine(lipgloss.NewStyle())
+	return m.renderHeaderLine(m.styles.Header)
 }
 
 func (m *Model) renderHeaderLine(headerStyle lipgloss.Style) string {
 	cols := make([]ui.HeaderColumn, 0, len(m.table.header))
-	showIndices := m.view.mode == modeCommand &&
-		(m.view.command.cmd == CmdSort || m.view.command.cmd == CmdColumns)
-
-	visibleIdx := 0
 	for _, col := range m.table.header {
 		if !col.Visible || col.Width <= 0 {
 			continue
 		}
-		visibleIdx++
 		name := m.sortedHeaderName(col)
-		if showIndices {
-			name = fmt.Sprintf("%d:%s", visibleIdx, name)
-		}
 		cols = append(cols, ui.HeaderColumn{
 			Name:    name,
 			Width:   col.Width,
 			Visible: col.Visible,
+			Frozen:  col.Frozen,
 		})
 	}
 
-	markerWidth := len(fmt.Sprintf("%d", len(m.table.rows))) +
-		utf8.RuneCountInString(m.styles.PillMarker) +
-		utf8.RuneCountInString(m.styles.CommentMarker)
-	return ui.RenderHeader(markerWidth, cols, m.styles.Cell, headerStyle)
+	markerWidth := m.tableMarkerWidth()
+	return ui.RenderHeader(
+		markerWidth,
+		cols,
+		m.tableContentWidth(),
+		m.view.columnScrollOffset,
+		m.styles.Cell,
+		headerStyle,
+	)
 }
 
 func (m *Model) footerView(width int) string {

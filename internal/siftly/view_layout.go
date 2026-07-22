@@ -56,7 +56,9 @@ func (m *Model) recomputeLayout(height int, width int) {
 	logging.Debugf("Update Received of type Windows Size Message. ViewPort was [%d] and is now getting set to height[%d] width [%d]", m.viewport.Height, viewportHeight, viewportWidth)
 	m.viewport.Height = viewportHeight
 	m.viewport.Width = viewportWidth
-	m.table.header = ui.LayoutColumns(m.table.header, viewportWidth)
+	m.viewport.SetXOffset(0)
+	m.table.header = ui.LayoutColumns(m.table.header, max(1, viewportWidth-m.tableMarkerWidth()))
+	m.clampColumnScrollOffset()
 }
 
 func (m *Model) refreshView(reason string, withLayout bool) {

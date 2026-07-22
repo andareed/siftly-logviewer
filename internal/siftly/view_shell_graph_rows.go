@@ -15,11 +15,7 @@ func (m *Model) renderGraphBlock(contentW int) string {
 		graphW = 0
 	}
 
-	header := make([]string, len(m.table.header))
-	for i := range m.table.header {
-		header[i] = m.table.header[i].Name
-	}
-	timeCol, seriesCol, valueCol, ok := featuregraph.ResolveColumnIndices(header, m.graphConfig)
+	timeCol, seriesCol, valueCol, ok := m.graphColumnIndices()
 	if !ok {
 		return m.styles.GraphArea.Width(contentW).Render(
 			ui.RenderGraphMessage(graphW, graphH, "Graph columns not configured"),
@@ -128,9 +124,13 @@ func (m *Model) renderRowAt(filteredIdx int) (string, int, bool) {
 		CommentPresent: commentPresent,
 		Mark:           m.table.markedRows[row.ID],
 		ColsMeta:       m.table.header,
+		RepeatedCols:   m.repeatedColumnsForDisplayedRow(filteredIdx),
+		ContentWidth:   m.tableContentWidth(),
+		ScrollOffset:   m.view.columnScrollOffset,
 		Styles: ui.RowStyles{
 			Row:                m.styles.Row,
 			RowSelected:        m.styles.RowSelected,
+			RepeatedCell:       m.styles.RepeatedCell,
 			Cell:               m.styles.Cell,
 			RedMarker:          m.styles.RedMarker,
 			GreenMarker:        m.styles.GreenMarker,

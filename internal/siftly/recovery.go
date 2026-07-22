@@ -53,6 +53,7 @@ type recoveryColumnDTO struct {
 	Index    int           `json:"index"`
 	Role     ui.ColumnRole `json:"role"`
 	Visible  bool          `json:"visible"`
+	Frozen   bool          `json:"frozen,omitempty"`
 	MinWidth int           `json:"minWidth"`
 	Weight   float64       `json:"weight"`
 }

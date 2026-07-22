@@ -78,6 +78,25 @@ func TestViewOperationsAreUndoableWithoutMakingDocumentDirty(t *testing.T) {
 	}
 }
 
+func TestFrozenColumnIsTrackedByUndoAndDirtyState(t *testing.T) {
+	m := newChangeTrackingTestModel()
+	m.table.header[0].Frozen = true
+	m.recordChange("freeze column")
+	m.view.columnScrollOffset = 4
+	if !m.dirty || !m.canUndo() {
+		t.Fatalf("freeze should be dirty and undoable: dirty=%t undo=%t", m.dirty, m.canUndo())
+	}
+
+	_ = m.undoLastChange()
+	if m.table.header[0].Frozen || m.dirty || m.view.columnScrollOffset != 0 {
+		t.Fatalf("undo freeze: frozen=%t dirty=%t offset=%d", m.table.header[0].Frozen, m.dirty, m.view.columnScrollOffset)
+	}
+	_ = m.redoLastChange()
+	if !m.table.header[0].Frozen || !m.dirty {
+		t.Fatalf("redo freeze: frozen=%t dirty=%t", m.table.header[0].Frozen, m.dirty)
+	}
+}
+
 func TestQuitRequiresSecondPressWhenDirty(t *testing.T) {
 	m := newChangeTrackingTestModel()
 	m.markCurrent(ui.MarkAmber)

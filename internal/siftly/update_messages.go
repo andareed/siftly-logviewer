@@ -149,6 +149,18 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 	case dialogs.ActionCommandCancel:
 		m.hideActiveDialog()
 		return nil
+	case dialogs.ActionColumnManagerApply:
+		m.hideActiveDialog()
+		if action.ColumnManager == nil {
+			return m.view.notice.Start("Column layout was not applied", "error", noticeDuration)
+		}
+		if err := m.applyColumnManagerResult(*action.ColumnManager); err != nil {
+			return m.view.notice.Start(err.Error(), "error", noticeDuration)
+		}
+		return m.view.notice.Start("Column layout applied", "success", noticeDuration)
+	case dialogs.ActionColumnManagerCancel:
+		m.hideActiveDialog()
+		return nil
 	default:
 		return nil
 	}

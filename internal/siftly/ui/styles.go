@@ -8,6 +8,7 @@ type Styles struct {
 	Header             lipgloss.Style
 	Row                lipgloss.Style
 	RowSelected        lipgloss.Style
+	RepeatedCell       lipgloss.Style
 	RowText            lipgloss.Style
 	RowSelectedText    lipgloss.Style
 	Cell               lipgloss.Style

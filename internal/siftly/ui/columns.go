@@ -13,6 +13,7 @@ type ColumnMeta struct {
 	Index    int
 	Role     ColumnRole
 	Visible  bool
+	Frozen   bool
 	MinWidth int
 	Weight   float64
 	Width    int

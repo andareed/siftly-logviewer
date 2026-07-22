@@ -8,7 +8,7 @@
 - [ ] Make the graph legend interactive: use `Tab`/`Shift+Tab` to cycle through series and allow the focused series to be included or excluded from both the graph and SVG export, with clear focus and exclusion states.
 - [ ] Show determinate progress for long operations where possible, including rows processed, percentage and elapsed time, with `Esc` cancellation while retaining the previous view.
 - [x] Add a searchable command palette covering every action and shortcut, and reorganise help into clear command categories.
-- [ ] Replace text-based column operations with a searchable column manager supporting visibility, ordering, sort direction, frozen columns and auto-fit.
+- [x] Replace text-based column operations with a searchable column manager supporting visibility, ordering, sort direction, frozen columns and auto-fit.
 - [ ] Add a simple column/operator/value filter builder while retaining regex as an advanced mode; show removable active-filter components and support saved views.
 - [ ] Add optional mouse support for scrolling, row selection, range extension and column-header actions while retaining full keyboard operation.
 - [ ] Add adaptive layouts for narrow terminals and explicit truecolour, ANSI-256 and monochrome themes with contrast tests for all interaction states.

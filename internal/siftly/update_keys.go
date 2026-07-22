@@ -262,9 +262,9 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openHelpDialog()
 		return m, nil
 	case viewActionScrollLeft:
-		m.viewport.ScrollLeft(4) // tune step
+		m.scrollColumns(-4)
 	case viewActionScrollRight:
-		m.viewport.ScrollRight(4)
+		m.scrollColumns(4)
 	case viewActionSave:
 		m.openSaveDialog()
 		return m, nil
@@ -414,12 +414,11 @@ func (m *Model) handleViewPrefixKey(msg tea.KeyMsg) (handled bool, cmd tea.Cmd, 
 
 	switch m.resolveViewPrefixAction(msg) {
 	case viewPrefixActionColumns:
-		seed := m.view.lastColumnsSpec
-		return true, m.enterCommand(CmdColumns, seed, true, false), false
+		return true, m.openColumnManager(), false
 	case viewPrefixActionSort:
-		return true, m.enterCommand(CmdSort, "", true, false), false
+		return true, m.openColumnManager(), false
 	case viewPrefixActionColumnOrder:
-		return true, m.enterCommand(CmdColumnOrder, m.currentColumnOrderSeed(), true, false), false
+		return true, m.openColumnManager(), false
 	case viewPrefixActionResetLayout:
 		return true, m.resetViewLayoutState(), true
 	case viewPrefixActionCommentEdit:

@@ -100,7 +100,7 @@ func (m *Model) currentColumnOrderSeed() string {
 func (m *Model) resetViewLayoutState() tea.Cmd {
 	layoutChanged := m.table.sortEnabled
 	for position, col := range m.table.header {
-		if !col.Visible || col.Index != position {
+		if !col.Visible || col.Frozen || col.Index != position {
 			layoutChanged = true
 			break
 		}
@@ -110,16 +110,17 @@ func (m *Model) resetViewLayoutState() tea.Cmd {
 	})
 	for i := range m.table.header {
 		m.table.header[i].Visible = true
+		m.table.header[i].Frozen = false
 	}
 	m.table.sortEnabled = false
 	m.table.sortColumn = -1
 	m.table.sortDesc = false
 	m.rebuildRowOrder()
 	m.applyFilter()
-	m.viewport.ScrollLeft(1 << 20)
+	m.view.columnScrollOffset = 0
 	if layoutChanged {
 		m.recordChange("reset view")
 	}
 	m.refreshView("reset-view-layout", true)
-	return m.view.notice.Start("Reset view: visibility, sort, order", "", noticeDuration)
+	return m.view.notice.Start("Reset view: visibility, freeze, sort, order", "", noticeDuration)
 }

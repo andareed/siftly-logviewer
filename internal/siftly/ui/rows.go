@@ -6,12 +6,14 @@ import (
 	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
+	xansi "github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 )
 
 type RowStyles struct {
 	Row                lipgloss.Style
 	RowSelected        lipgloss.Style
+	RepeatedCell       lipgloss.Style
 	Cell               lipgloss.Style
 	RedMarker          lipgloss.Style
 	GreenMarker        lipgloss.Style
@@ -36,22 +38,66 @@ type RowRenderInput struct {
 	CommentPresent bool
 	Mark           MarkColor
 	ColsMeta       []ColumnMeta
+	RepeatedCols   []bool
+	ContentWidth   int
+	ScrollOffset   int
 	Styles         RowStyles
 }
 
 func RenderRowCells(cols []string, colsMeta []ColumnMeta, style lipgloss.Style) (string, int) {
+	rendered := renderColumnCells(cols, colsMeta, style, rowCellOptions{})
+	return rendered, lipgloss.Height(rendered)
+}
+
+type rowCellOptions struct {
+	repeatedCols []bool
+	repeatedCell lipgloss.Style
+	searchQuery  string
+	searchStyle  lipgloss.Style
+}
+
+func renderColumnCells(cols []string, colsMeta []ColumnMeta, style lipgloss.Style, options rowCellOptions) string {
 	var rendered []string
-	for i, text := range cols {
-		if i >= len(colsMeta) {
-			break
-		}
-		meta := colsMeta[i]
+	for _, meta := range colsMeta {
 		if !meta.Visible || meta.Width <= 0 {
 			continue
 		}
-		rendered = append(rendered, style.Width(meta.Width).Render(text))
+		text := ""
+		if meta.Index >= 0 && meta.Index < len(cols) {
+			text = singleLineCellText(cols[meta.Index])
+		}
+		if strings.TrimSpace(options.searchQuery) != "" {
+			text = highlightMatches(text, options.searchQuery, options.searchStyle)
+		}
+		textWidth := meta.Width - style.GetHorizontalFrameSize()
+		if textWidth < 1 {
+			textWidth = 1
+		}
+		text = xansi.Truncate(text, textWidth, "…")
+		if meta.Index >= 0 && meta.Index < len(options.repeatedCols) && options.repeatedCols[meta.Index] {
+			text = options.repeatedCell.Render(text)
+		}
+		rendered = append(rendered, style.Width(meta.Width).MaxHeight(1).Render(text))
 	}
-	joined := lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
+	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
+}
+
+func renderScrollableRowCells(cols []string, colsMeta []ColumnMeta, style lipgloss.Style, options rowCellOptions, width, offset int) (string, int) {
+	frozenMeta := make([]ColumnMeta, 0, len(colsMeta))
+	scrollingMeta := make([]ColumnMeta, 0, len(colsMeta))
+	for _, meta := range colsMeta {
+		if !meta.Visible || meta.Width <= 0 {
+			continue
+		}
+		if meta.Frozen {
+			frozenMeta = append(frozenMeta, meta)
+		} else {
+			scrollingMeta = append(scrollingMeta, meta)
+		}
+	}
+	frozen := renderColumnCells(cols, frozenMeta, style, options)
+	scrolling := renderColumnCells(cols, scrollingMeta, style, options)
+	joined := composeHorizontalSegments(frozen, scrolling, width, offset)
 	return joined, lipgloss.Height(joined)
 }
 
@@ -63,32 +109,34 @@ func RenderRow(in RowRenderInput) (string, int) {
 	standardMarker := getRowMarker(in.Mark, in.Styles)
 	markerWidth := len(fmt.Sprintf("%d", in.TotalRows)) + utf8.RuneCountInString(in.Styles.CommentMarker)
 
-	firstLineMarker := standardMarker + rowBgStyle.Render(fmt.Sprintf("%*d", markerWidth, in.OriginalIndex))
-	additionalLineMarker := standardMarker + rowBgStyle.Render(strings.Repeat(" ", markerWidth))
+	firstLineMarker := standardMarker + rowBgStyle.Render(fmt.Sprintf("%*d", markerWidth, in.OriginalIndex)+tableGutterSeparator)
+	additionalLineMarker := standardMarker + rowBgStyle.Render(strings.Repeat(" ", markerWidth)+tableGutterSeparator)
 	if in.CommentPresent {
 		firstLineMarker = standardMarker + rowBgStyle.Render(
-			in.Styles.CommentMarker+fmt.Sprintf("%*d", markerWidth-utf8.RuneCountInString(in.Styles.CommentMarker), in.OriginalIndex),
+			in.Styles.CommentMarker+fmt.Sprintf("%*d", markerWidth-utf8.RuneCountInString(in.Styles.CommentMarker), in.OriginalIndex)+tableGutterSeparator,
 		)
 	}
 
-	cols := in.Cols
-	if strings.TrimSpace(in.SearchQuery) != "" {
-		highlighted := make([]string, len(cols))
-		for i, col := range cols {
-			highlighted[i] = highlightMatches(col, in.SearchQuery, in.Styles.SearchHighlight)
-		}
-		cols = highlighted
+	options := rowCellOptions{
+		searchQuery: in.SearchQuery,
+		searchStyle: in.Styles.SearchHighlight,
+	}
+	if !in.Selected && !in.RangeSelected && strings.TrimSpace(in.SearchQuery) == "" {
+		options.repeatedCols = in.RepeatedCols
+		options.repeatedCell = in.Styles.RepeatedCell
 	}
 
-	content, rowHeight := RenderRowCells(cols, in.ColsMeta, in.Styles.Cell)
+	content := renderColumnCells(in.Cols, in.ColsMeta, in.Styles.Cell, options)
+	rowHeight := lipgloss.Height(content)
+	if in.ContentWidth > 0 {
+		content, rowHeight = renderScrollableRowCells(in.Cols, in.ColsMeta, in.Styles.Cell, options, in.ContentWidth, in.ScrollOffset)
+	}
 	lines := strings.Split(content, "\n")
 
 	for i := range lines {
 		left := additionalLineMarker
 		line := lines[i]
-		if strings.TrimSpace(in.SearchQuery) != "" {
-			line = restoreRowStyleAfterReset(line, rowPrefix)
-		}
+		line = restoreRowStyleAfterReset(line, rowPrefix)
 		right := rowPrefix + line + rowSuffix
 		if i == 0 {
 			left = firstLineMarker
@@ -97,6 +145,13 @@ func RenderRow(in RowRenderInput) (string, int) {
 	}
 
 	return strings.Join(lines, "\n"), rowHeight
+}
+
+func singleLineCellText(value string) string {
+	value = strings.ReplaceAll(value, "\r\n", "\n")
+	value = strings.ReplaceAll(value, "\r", "\n")
+	value = strings.ReplaceAll(value, "\t", " ")
+	return strings.ReplaceAll(value, "\n", " ↵ ")
 }
 
 func resolveRowVisualStyle(styles RowStyles, cursor, rangeSelected bool) (lipgloss.Style, lipgloss.Color, lipgloss.Color) {

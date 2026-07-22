@@ -3,6 +3,7 @@ package siftly
 import (
 	"testing"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/features/dialogs"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -59,7 +60,7 @@ func TestCommandCatalogUsesExistingPrefixSequences(t *testing.T) {
 
 	tests := map[string][]string{
 		commandCommentEdit:   {"c", "e"},
-		commandSort:          {"v", "s"},
+		commandColumns:       {"v", "c"},
 		commandTimeWindow:    {"t", "w"},
 		commandExportData:    {"e", "d"},
 		commandExportGraph:   {"e", "g"},
@@ -107,8 +108,8 @@ func TestPaletteCommandExecutesExistingPrefixHandler(t *testing.T) {
 	m := newChangeTrackingTestModel()
 	m.runPaletteCommand(commandColumns)
 
-	if m.view.mode != modeCommand || m.view.command.cmd != CmdColumns {
-		t.Fatalf("palette columns command left mode=%v command=%v", m.view.mode, m.view.command.cmd)
+	if _, ok := m.activeDialog.(*dialogs.ColumnManager); !ok {
+		t.Fatalf("palette columns command opened %T, want column manager", m.activeDialog)
 	}
 }
 
@@ -124,7 +125,7 @@ func TestCommandPaletteSelectionExecutesThroughModelUpdate(t *testing.T) {
 	}
 	_, _ = m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 
-	if m.view.mode != modeCommand || m.view.command.cmd != CmdColumns {
-		t.Fatalf("palette model update left mode=%v command=%v dialog=%T", m.view.mode, m.view.command.cmd, m.activeDialog)
+	if _, ok := m.activeDialog.(*dialogs.ColumnManager); !ok {
+		t.Fatalf("palette model update opened %T, want column manager", m.activeDialog)
 	}
 }

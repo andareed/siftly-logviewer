@@ -15,13 +15,16 @@ const (
 	ActionFilterCancel
 	ActionCommandRun
 	ActionCommandCancel
+	ActionColumnManagerApply
+	ActionColumnManagerCancel
 )
 
 type Action struct {
-	Kind      ActionKind
-	Path      string
-	Pattern   string
-	CommandID string
+	Kind          ActionKind
+	Path          string
+	Pattern       string
+	CommandID     string
+	ColumnManager *ColumnManagerResult
 }
 
 type CommandItem struct {
@@ -33,6 +36,22 @@ type CommandItem struct {
 	Keywords       string
 	Enabled        bool
 	DisabledReason string
+}
+
+type ColumnManagerItem struct {
+	SourceIndex int
+	Name        string
+	Visible     bool
+	Frozen      bool
+	MinWidth    int
+	AutoFit     bool
+}
+
+type ColumnManagerResult struct {
+	Columns     []ColumnManagerItem
+	SortEnabled bool
+	SortColumn  int
+	SortDesc    bool
 }
 
 // Dialog is the common interface all dialogs (Save, Export, Help, etc.) implement.
