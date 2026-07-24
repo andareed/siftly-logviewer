@@ -30,4 +30,4 @@ This release consolidates the major Siftly improvements introduced since 0.5, in
 - Save uses `s`, exports use `e`, the column manager opens with `v`, and undo/redo use `u` and `r`.
 - Filter history is available with `Ctrl+R` or `Up`; full-source reload is available from the command palette.
 - `devfmt` is no longer built or shipped with Siftly.
-- Truecolour terminals are recommended; explicit ANSI-256 styling remains planned.
+- Truecolour terminals retain the richest presentation, with an explicit ANSI-256 fallback for constrained remote sessions.

@@ -106,6 +106,14 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, comboCmd
 	}
 
+	if m.handleBatchedRowNavigation(msg) {
+		m.view.quitConfirmUntil = time.Time{}
+		if m.ready {
+			m.refreshView("view-key-batch", false)
+		}
+		return m, nil
+	}
+
 	action := m.resolveViewAction(msg)
 	if action != viewActionQuit && action != viewActionCancelQuit {
 		m.view.quitConfirmUntil = time.Time{}
@@ -262,6 +270,28 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.refreshView("view-key", false)
 	}
 	return m, cmd
+}
+
+func (m *Model) handleBatchedRowNavigation(msg tea.KeyMsg) bool {
+	if msg.Type != tea.KeyRunes || msg.Alt || msg.Paste || len(msg.Runes) < 2 {
+		return false
+	}
+	for _, r := range msg.Runes {
+		if r != 'j' && r != 'k' {
+			return false
+		}
+	}
+
+	last := len(m.table.filteredIndices) - 1
+	for _, r := range msg.Runes {
+		switch {
+		case r == 'j' && m.cursor < last:
+			m.cursor++
+		case r == 'k' && m.cursor > 0:
+			m.cursor--
+		}
+	}
+	return true
 }
 
 func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {

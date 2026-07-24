@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 // ColorTokens names colours by purpose so components do not maintain their own
@@ -72,30 +73,9 @@ type DesignTokens struct {
 
 // DefaultDesignTokens returns a fresh copy of Siftly's default theme.
 func DefaultDesignTokens() DesignTokens {
-	colors := ColorTokens{
-		SurfaceFooter:      lipgloss.Color("#202020"),
-		SurfaceFooterInset: lipgloss.Color("#101010"),
-		SurfaceHeader:      lipgloss.Color("#303030"),
-		SurfaceSelected:    lipgloss.Color("#3a3a3a"),
-		SurfaceRange:       lipgloss.Color("#2a2a2a"),
-		SurfaceOverlay:     lipgloss.Color("#303030"),
-		Text:               lipgloss.Color("#c0c0c0"),
-		TextStrong:         lipgloss.Color("#f0f0f0"),
-		TextSelected:       lipgloss.Color("#e0e0e0"),
-		TextMuted:          lipgloss.Color("#a0a0a0"),
-		TextSubtle:         lipgloss.Color("#777777"),
-		TextInverse:        lipgloss.Color("#000000"),
-		Border:             lipgloss.Color("#585858"),
-		BorderStrong:       lipgloss.Color("#8a8a8a"),
-		Accent:             lipgloss.Color("#ff9f1c"),
-		Success:            lipgloss.Color("#72d99c"),
-		Warning:            lipgloss.Color("#f0b45a"),
-		Error:              lipgloss.Color("#ff6b6b"),
-		SearchBackground:   lipgloss.Color("#f5c542"),
-		SearchForeground:   lipgloss.Color("#000000"),
-		MarkRed:            lipgloss.Color("1"),
-		MarkGreen:          lipgloss.Color("2"),
-		MarkAmber:          lipgloss.Color("3"),
+	colors, graphSeries := trueColorPalette()
+	if lipgloss.ColorProfile() == termenv.ANSI256 {
+		colors, graphSeries = ansi256Palette()
 	}
 
 	return DesignTokens{
@@ -126,15 +106,78 @@ func DefaultDesignTokens() DesignTokens {
 			Warning: lipgloss.NewStyle().Foreground(colors.Warning),
 			Error:   lipgloss.NewStyle().Foreground(colors.Error),
 		},
-		GraphSeries: []lipgloss.Color{
+		GraphSeries: graphSeries,
+	}
+}
+
+func trueColorPalette() (ColorTokens, []lipgloss.Color) {
+	return ColorTokens{
+			SurfaceFooter:      lipgloss.Color("#202020"),
+			SurfaceFooterInset: lipgloss.Color("#101010"),
+			SurfaceHeader:      lipgloss.Color("#303030"),
+			SurfaceSelected:    lipgloss.Color("#3a3a3a"),
+			SurfaceRange:       lipgloss.Color("#2a2a2a"),
+			SurfaceOverlay:     lipgloss.Color("#303030"),
+			Text:               lipgloss.Color("#c0c0c0"),
+			TextStrong:         lipgloss.Color("#f0f0f0"),
+			TextSelected:       lipgloss.Color("#e0e0e0"),
+			TextMuted:          lipgloss.Color("#a0a0a0"),
+			TextSubtle:         lipgloss.Color("#777777"),
+			TextInverse:        lipgloss.Color("#000000"),
+			Border:             lipgloss.Color("#585858"),
+			BorderStrong:       lipgloss.Color("#8a8a8a"),
+			Accent:             lipgloss.Color("#ff9f1c"),
+			Success:            lipgloss.Color("#72d99c"),
+			Warning:            lipgloss.Color("#f0b45a"),
+			Error:              lipgloss.Color("#ff6b6b"),
+			SearchBackground:   lipgloss.Color("#f5c542"),
+			SearchForeground:   lipgloss.Color("#000000"),
+			MarkRed:            lipgloss.Color("1"),
+			MarkGreen:          lipgloss.Color("2"),
+			MarkAmber:          lipgloss.Color("3"),
+		}, []lipgloss.Color{
 			lipgloss.Color("#ff6b6b"),
 			lipgloss.Color("#4ecdc4"),
 			lipgloss.Color("#ffe66d"),
 			lipgloss.Color("#5b8def"),
 			lipgloss.Color("#a66dd4"),
 			lipgloss.Color("#f08a24"),
-		},
-	}
+		}
+}
+
+func ansi256Palette() (ColorTokens, []lipgloss.Color) {
+	return ColorTokens{
+			SurfaceFooter:      lipgloss.Color("234"),
+			SurfaceFooterInset: lipgloss.Color("233"),
+			SurfaceHeader:      lipgloss.Color("236"),
+			SurfaceSelected:    lipgloss.Color("238"),
+			SurfaceRange:       lipgloss.Color("235"),
+			SurfaceOverlay:     lipgloss.Color("236"),
+			Text:               lipgloss.Color("250"),
+			TextStrong:         lipgloss.Color("255"),
+			TextSelected:       lipgloss.Color("254"),
+			TextMuted:          lipgloss.Color("247"),
+			TextSubtle:         lipgloss.Color("243"),
+			TextInverse:        lipgloss.Color("16"),
+			Border:             lipgloss.Color("240"),
+			BorderStrong:       lipgloss.Color("245"),
+			Accent:             lipgloss.Color("214"),
+			Success:            lipgloss.Color("114"),
+			Warning:            lipgloss.Color("215"),
+			Error:              lipgloss.Color("203"),
+			SearchBackground:   lipgloss.Color("220"),
+			SearchForeground:   lipgloss.Color("16"),
+			MarkRed:            lipgloss.Color("1"),
+			MarkGreen:          lipgloss.Color("2"),
+			MarkAmber:          lipgloss.Color("3"),
+		}, []lipgloss.Color{
+			lipgloss.Color("203"),
+			lipgloss.Color("80"),
+			lipgloss.Color("221"),
+			lipgloss.Color("69"),
+			lipgloss.Color("134"),
+			lipgloss.Color("208"),
+		}
 }
 
 // ResolveDesignTokens supplies the default theme for zero-value style bundles.

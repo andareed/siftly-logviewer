@@ -34,6 +34,66 @@ func TestRangeSelectionKeyFlow(t *testing.T) {
 	}
 }
 
+func TestBatchedVimNavigationMovesForEveryRune(t *testing.T) {
+	m := &Model{
+		table: tableState{filteredIndices: make([]int, 10)},
+		view:  viewState{mode: modeView},
+	}
+
+	_, _ = m.handleViewModeKey(tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("jjjjj"),
+	})
+	if m.cursor != 5 {
+		t.Fatalf("cursor after batched j = %d want 5", m.cursor)
+	}
+
+	_, _ = m.handleViewModeKey(tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("kkk"),
+	})
+	if m.cursor != 2 {
+		t.Fatalf("cursor after batched k = %d want 2", m.cursor)
+	}
+}
+
+func TestBatchedVimNavigationRespectsBoundsAndRange(t *testing.T) {
+	m := newRowSelectionTestModel()
+	m.toggleRowRangeSelection()
+
+	_, _ = m.handleViewModeKey(tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("jjjjj"),
+	})
+	if m.cursor != len(m.table.filteredIndices)-1 {
+		t.Fatalf("cursor = %d want last row", m.cursor)
+	}
+	if got := m.selectedRowCount(); got != len(m.table.filteredIndices) {
+		t.Fatalf("selected row count = %d want %d", got, len(m.table.filteredIndices))
+	}
+
+	_, _ = m.handleViewModeKey(tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("kkkkk"),
+	})
+	if m.cursor != 0 {
+		t.Fatalf("cursor = %d want first row", m.cursor)
+	}
+}
+
+func TestBatchedVimNavigationDoesNotTreatPasteAsKeys(t *testing.T) {
+	m := newRowSelectionTestModel()
+
+	_, _ = m.handleViewModeKey(tea.KeyMsg{
+		Type:  tea.KeyRunes,
+		Runes: []rune("jj"),
+		Paste: true,
+	})
+	if m.cursor != 0 {
+		t.Fatalf("cursor after pasted j = %d want 0", m.cursor)
+	}
+}
+
 func TestApplyingFilterClearsRangeSelection(t *testing.T) {
 	m := newRowSelectionTestModel()
 	m.toggleRowRangeSelection()
