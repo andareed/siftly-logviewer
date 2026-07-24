@@ -71,6 +71,9 @@ func TestExportGraphModelWritesSVGForFilteredRows(t *testing.T) {
 	if !strings.Contains(text, `<svg`) {
 		t.Fatalf("export should be svg: %s", text)
 	}
+	if !strings.Contains(text, `width="1920" height="1080" viewBox="0 0 1920 1080"`) {
+		t.Fatalf("export should use the full-HD default canvas: %s", text)
+	}
 	if !strings.Contains(text, "metric.a") {
 		t.Fatalf("export should include filtered series: %s", text)
 	}

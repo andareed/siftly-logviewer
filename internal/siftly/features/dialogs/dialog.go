@@ -17,6 +17,9 @@ const (
 	ActionCommandCancel
 	ActionColumnManagerApply
 	ActionColumnManagerCancel
+	ActionRecoveryRestore
+	ActionRecoveryDiscard
+	ActionRecoveryQuit
 )
 
 type Action struct {

@@ -1,24 +1,45 @@
 # Go build artifacts
 sfhost
 bin/
+dist/
+.gocache/
 
 # Logs and debug
 *.log
-debug.log
 testdata/
 
 # Example/test data
 hostlog.csv
 *.csv
+*.tsv
 .coolnames.used
 *.json
 run*.sh
 !scripts/*.sh
 
+# Local secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# AI assistant metadata
+.codex
+.agents/
+.claude/
+.cursor/
+.continue/
+.aider*
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+
 # IDE/editor settings
 .vscode/
 .idea/
-
-# build outputs
-dist/
-testdata/today.json

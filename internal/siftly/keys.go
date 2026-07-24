@@ -42,7 +42,6 @@ type Keymap struct {
 	JumpToEnd           key.Binding
 	JumpToLineNo        key.Binding
 	ToggleGraph         key.Binding
-	ReloadFull          key.Binding
 	ColumnManager       key.Binding
 }
 
@@ -194,10 +193,6 @@ var Keys = Keymap{
 	ToggleGraph: key.NewBinding(
 		key.WithKeys("w"),
 		key.WithHelp("w", "Toggle graph"),
-	),
-	ReloadFull: key.NewBinding(
-		key.WithKeys("ctrl+r"),
-		key.WithHelp("ctrl+r", "Reload full source data"),
 	),
 	ColumnManager: key.NewBinding(
 		key.WithKeys("v"),

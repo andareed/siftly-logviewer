@@ -33,7 +33,7 @@ func TestCommandHintsLineUsesUniformKeyActionPattern(t *testing.T) {
 func TestFilterCommandHintsIncludeHistoryPaletteShortcut(t *testing.T) {
 	m := Model{}
 	hint := m.commandHintsLine(CmdFilter)
-	if !strings.Contains(hint, "ctrl+h: history") {
+	if !strings.Contains(hint, "ctrl+r/up: history") {
 		t.Fatalf("filter hint should include history shortcut: %q", hint)
 	}
 }

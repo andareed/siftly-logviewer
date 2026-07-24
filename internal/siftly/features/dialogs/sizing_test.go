@@ -29,7 +29,7 @@ func TestDialogsFitCompactTerminalAndResizeWhileOpen(t *testing.T) {
 		NewColumnManager(columns, columns, false, -1, false, 120, 40, "", ""),
 		NewFilterPaletteDialog(
 			[]FilterPreset{{Pattern: "severity=error", Description: "Errors"}},
-			[]string{"host=nascent"},
+			[]string{"host=example-host"},
 			120,
 			40,
 			"",

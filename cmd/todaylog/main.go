@@ -1,7 +1,15 @@
 package main
 
-import "github.com/andareed/siftly-hostlog/internal/todaylog/cli"
+import (
+	"fmt"
+	"os"
+
+	"github.com/andareed/siftly-hostlog/internal/todaylog/cli"
+)
 
 func main() {
-	cli.Run()
+	if err := cli.Run(os.Args); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
 }

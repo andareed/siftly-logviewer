@@ -24,8 +24,7 @@ func newModelFromJSONFile(path string) (*siftly.Model, error) {
 	if err := siftly.LoadModel(m, path); err != nil {
 		return nil, err
 	}
-	m.InitialPath = path
-	m.SetStyles(SiftlyStyles())
+	configurePluginlogModel(m, path)
 	m.InitialiseView()
 	return m, nil
 }
@@ -45,8 +44,13 @@ func newModelFromLogFile(path string) (*siftly.Model, error) {
 	if err != nil {
 		return nil, err
 	}
-	m.InitialPath = path
-	m.SetStyles(SiftlyStyles())
+	configurePluginlogModel(m, path)
 	m.InitialiseView()
 	return m, nil
+}
+
+func configurePluginlogModel(m *siftly.Model, path string) {
+	m.InitialPath = path
+	m.ApplyColumnSchema(pluginlogColumnSchema())
+	m.SetStyles(SiftlyStyles())
 }

@@ -34,8 +34,9 @@ func hostlogColumnSchema() siftly.ColumnSchema {
 		RoleForName:     detectRole,
 		RoleDefaults: map[ui.ColumnRole]siftly.RoleLayout{
 			RolePrimary: {
-				MinWidth: 30,
-				Weight:   5.0,
+				MinWidth:  30,
+				Weight:    5.0,
+				WrapLines: 4,
 			},
 			RoleSecondary: {
 				MinWidth: 12,

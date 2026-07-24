@@ -14,7 +14,6 @@ Usage: scripts/install-remote.sh [--dry-run] [DEST_ROOT]
 Copies versioned Linux binaries from dist/ into the remote tool layout:
   hostlog  -> DEST_ROOT/hostlog/scripts/hostlog
   todaylog -> DEST_ROOT/todaylog/scripts/todaylog
-  devfmt   -> DEST_ROOT/devinfo/scripts/devinfo
 
 Environment:
   DIST_DIR   Source directory, default: ./dist
@@ -116,4 +115,3 @@ install_tool() {
 
 install_tool hostlog hostlog hostlog
 install_tool todaylog todaylog todaylog
-install_tool devfmt devinfo devinfo

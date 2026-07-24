@@ -9,7 +9,9 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/user"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -49,13 +51,14 @@ type recoverySourceDTO struct {
 }
 
 type recoveryColumnDTO struct {
-	Name     string        `json:"name"`
-	Index    int           `json:"index"`
-	Role     ui.ColumnRole `json:"role"`
-	Visible  bool          `json:"visible"`
-	Frozen   bool          `json:"frozen,omitempty"`
-	MinWidth int           `json:"minWidth"`
-	Weight   float64       `json:"weight"`
+	Name      string        `json:"name"`
+	Index     int           `json:"index"`
+	Role      ui.ColumnRole `json:"role"`
+	Visible   bool          `json:"visible"`
+	Frozen    bool          `json:"frozen,omitempty"`
+	MinWidth  int           `json:"minWidth"`
+	Weight    float64       `json:"weight"`
+	WrapLines int           `json:"wrapLines,omitempty"`
 }
 
 type recoveryStateDTO struct {
@@ -80,7 +83,15 @@ type recoverySnapshotDTO struct {
 	State   recoveryStateDTO  `json:"state"`
 }
 
-// SetRecoveryPath overrides the cache-derived recovery path. It is primarily
+type pendingRecovery struct {
+	state      trackedState
+	path       string
+	sourceName string
+	savedAt    string
+	contents   string
+}
+
+// SetRecoveryPath overrides the source-adjacent recovery path. It is primarily
 // useful to wrappers that manage their own state directory.
 func (m *Model) SetRecoveryPath(path string) {
 	m.changes.recoveryPathOverride = strings.TrimSpace(path)
@@ -155,12 +166,23 @@ func (m *Model) writeRecoverySnapshotNow() error {
 	return writeRecoveryFile(path, snapshot)
 }
 
-func (m *Model) restoreRecoverySnapshot() {
-	path, err := m.recoveryFilePath()
+func (m *Model) prepareRecoverySnapshot() {
+	sidecarPath, err := m.recoveryFilePath()
 	if err != nil {
 		return
 	}
+	path := sidecarPath
 	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		legacyPath, legacyErr := m.legacyRecoveryFilePath()
+		if legacyErr != nil {
+			return
+		}
+		data, err = os.ReadFile(legacyPath)
+		if err == nil {
+			path = legacyPath
+		}
+	}
 	if errors.Is(err, os.ErrNotExist) {
 		return
 	}
@@ -207,16 +229,60 @@ func (m *Model) restoreRecoverySnapshot() {
 	}
 
 	baseline := m.changes.baseline
-	m.restoreTrackedState(state, false)
-	restored := m.captureTrackedState()
-	if persistentStatesEqual(restored, baseline) {
+	state = normalizeRecoveryColumnWrapping(state, baseline)
+	if persistentStatesEqual(state, baseline) {
 		_ = removeRecoveryFile(path)
 		return
 	}
+	if path != sidecarPath {
+		if err := writeRecoveryFile(sidecarPath, snapshot); err != nil {
+			logging.Errorf("migrate legacy recovery snapshot: %v", err)
+		} else {
+			_ = removeRecoveryFile(path)
+			path = sidecarPath
+		}
+	}
+	m.changes.pendingRecovery = &pendingRecovery{
+		state:      state,
+		path:       path,
+		sourceName: filepath.Base(source.Path),
+		savedAt:    recoverySavedAtLabel(snapshot.SavedAt),
+		contents:   recoveryContentsLabel(state, baseline),
+	}
+}
+
+func (m *Model) restorePendingRecovery() tea.Cmd {
+	pending := m.changes.pendingRecovery
+	if pending == nil {
+		return m.view.notice.Start("No recovery is available", "warn", noticeDuration)
+	}
+	m.changes.pendingRecovery = nil
+
+	baseline := m.changes.baseline
+	m.restoreTrackedState(pending.state, true)
+	restored := m.captureTrackedState()
+	if persistentStatesEqual(restored, baseline) {
+		_ = removeRecoveryFile(pending.path)
+		return m.view.notice.Start("Recovery contained no unsaved changes", "warn", noticeDuration)
+	}
+
 	m.pushUndo(historyEntry{state: baseline, label: "recovered changes", size: trackedStateSize(baseline)})
 	m.changes.current = restored
 	m.updateDirtyFromBaseline()
-	m.changes.recoveredOnStart = true
+	return m.view.notice.Start("Unsaved changes restored", "warn", noticeDuration)
+}
+
+func (m *Model) discardPendingRecovery() tea.Cmd {
+	pending := m.changes.pendingRecovery
+	if pending == nil {
+		return m.view.notice.Start("No recovery is available", "warn", noticeDuration)
+	}
+	m.changes.pendingRecovery = nil
+	if err := removeRecoveryFile(pending.path); err != nil {
+		logging.Errorf("discard recovery snapshot: %v", err)
+		return m.view.notice.Start("Could not remove recovery file", "error", noticeDuration)
+	}
+	return m.view.notice.Start("Recovery discarded", "success", noticeDuration)
 }
 
 func (m *Model) buildRecoverySnapshot() (recoverySnapshotDTO, error) {
@@ -280,6 +346,29 @@ func (m *Model) recoveryFilePath() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	absPath = filepath.Clean(absPath)
+	name := filepath.Base(absPath)
+	if name == "" || name == "." || name == string(filepath.Separator) {
+		return "", errRecoveryUnavailable
+	}
+	return filepath.Join(
+		filepath.Dir(absPath),
+		"."+name+".siftly-recovery-"+recoveryOwnerToken()+".json",
+	), nil
+}
+
+func (m *Model) legacyRecoveryFilePath() (string, error) {
+	if m.changes.recoveryPathOverride != "" {
+		return "", errRecoveryUnavailable
+	}
+	documentPath := m.recoveryDocumentPath()
+	if documentPath == "" {
+		return "", errRecoveryUnavailable
+	}
+	absPath, err := filepath.Abs(documentPath)
+	if err != nil {
+		return "", err
+	}
 	cacheDir, err := os.UserCacheDir()
 	if err != nil || cacheDir == "" {
 		return "", errRecoveryUnavailable
@@ -290,6 +379,108 @@ func (m *Model) recoveryFilePath() (string, error) {
 		name = "document"
 	}
 	return filepath.Join(cacheDir, "siftly", "recovery", name+"-"+hex.EncodeToString(digest[:8])+".json"), nil
+}
+
+func recoveryOwnerToken() string {
+	current, err := user.Current()
+	if err == nil {
+		if token := sanitizeRecoveryOwner(current.Uid); token != "" {
+			return token
+		}
+		if token := sanitizeRecoveryOwner(current.Username); token != "" {
+			return token
+		}
+	}
+	return "user"
+}
+
+func sanitizeRecoveryOwner(value string) string {
+	value = strings.TrimSpace(value)
+	var token strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z',
+			r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9',
+			r == '-',
+			r == '_':
+			token.WriteRune(r)
+		default:
+			token.WriteByte('-')
+		}
+	}
+	result := strings.Trim(token.String(), "-_")
+	if result != "" && len(result) <= 32 {
+		return result
+	}
+	if value == "" {
+		return ""
+	}
+	digest := sha256.Sum256([]byte(value))
+	return "u-" + hex.EncodeToString(digest[:8])
+}
+
+func recoverySavedAtLabel(value string) string {
+	savedAt, err := time.Parse(time.RFC3339Nano, value)
+	if err != nil {
+		return strings.TrimSpace(value)
+	}
+	return savedAt.Local().Format("02 Jan 2006 15:04:05 MST")
+}
+
+func recoveryContentsLabel(state, baseline trackedState) string {
+	parts := make([]string, 0, 8)
+	if count := len(state.MarkedRows); count > 0 {
+		parts = append(parts, pluralCount(count, "mark", "marks"))
+	}
+	if count := len(state.CommentRows); count > 0 {
+		parts = append(parts, pluralCount(count, "comment", "comments"))
+	}
+	if !reflect.DeepEqual(state.Columns, baseline.Columns) {
+		parts = append(parts, "column layout")
+	}
+	if state.TimeWindow != baseline.TimeWindow {
+		parts = append(parts, "time window")
+	}
+	if state.SortEnabled {
+		parts = append(parts, "sorted view")
+	}
+	if state.FilterPattern != "" {
+		parts = append(parts, "filter")
+	}
+	if state.ShowOnlyMarked {
+		parts = append(parts, "marks-only view")
+	}
+	if state.GraphOpen != baseline.GraphOpen {
+		parts = append(parts, "graph state")
+	}
+	if len(parts) == 0 {
+		return "saved session state"
+	}
+	return strings.Join(parts, ", ")
+}
+
+func normalizeRecoveryColumnWrapping(state, baseline trackedState) trackedState {
+	wrapLines := make(map[[2]string]int, len(baseline.Columns))
+	for _, column := range baseline.Columns {
+		key := [2]string{strconv.Itoa(column.Index), column.Name}
+		wrapLines[key] = column.WrapLines
+	}
+	for i := range state.Columns {
+		if state.Columns[i].WrapLines != 0 {
+			continue
+		}
+		key := [2]string{strconv.Itoa(state.Columns[i].Index), state.Columns[i].Name}
+		state.Columns[i].WrapLines = wrapLines[key]
+	}
+	return state
+}
+
+func pluralCount(count int, singular, plural string) string {
+	if count == 1 {
+		return "1 " + singular
+	}
+	return strconv.Itoa(count) + " " + plural
 }
 
 func recoveryHeaderHash(header []ui.ColumnMeta) string {
@@ -386,13 +577,9 @@ func trackedStateFromRecoveryDTO(dto recoveryStateDTO) (trackedState, error) {
 }
 
 func writeRecoveryFile(path string, snapshot recoverySnapshotDTO) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return err
-	}
 	return writeAtomicFile(path, 0o600, func(w io.Writer) error {
 		buffer := bufio.NewWriterSize(w, 64<<10)
 		encoder := json.NewEncoder(buffer)
-		encoder.SetIndent("", "  ")
 		if err := encoder.Encode(snapshot); err != nil {
 			return err
 		}

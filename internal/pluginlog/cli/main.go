@@ -3,34 +3,32 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/andareed/siftly-hostlog/internal/pluginlog"
 	"github.com/urfave/cli/v3"
 )
 
-func Run() {
-	app := &cli.Command{
-		Name:    "pluginlog",
-		Usage:   "Siftly Toolkit: Plugin Log Viewer",
-		Version: pluginlog.Version,
+type runFunc func(inputPath, debugLogPath, filterPresetsPath, filterHistoryPath string) error
+
+func Run(args []string) error {
+	return newCommand(pluginlog.Run).Run(context.Background(), args)
+}
+
+func newCommand(run runFunc) *cli.Command {
+	return &cli.Command{
+		Name:      "pluginlog",
+		Usage:     "Review plugin logs and Siftly snapshots",
+		UsageText: "pluginlog [options] FILE",
+		Version:   pluginlog.Version,
+		Arguments: []cli.Argument{
+			&cli.StringArg{Name: "file", UsageText: "FILE"},
+		},
 		Action: func(_ context.Context, c *cli.Command) error {
-			if c.Bool("version") {
-				fmt.Println("Version:", pluginlog.Version)
-				return nil
+			inputPath, err := resolveInputPath(c)
+			if err != nil {
+				return err
 			}
-
-			inputPath := c.String("input")
-			if inputPath == "" {
-				inputPath = c.Args().First()
-			}
-
-			if inputPath == "" {
-				_ = cli.ShowAppHelp(c)
-				return cli.Exit("", 1)
-			}
-
-			return pluginlog.Run(
+			return run(
 				inputPath,
 				c.String("debug"),
 				c.String("filter-presets"),
@@ -39,28 +37,48 @@ func Run() {
 		},
 		Flags: []cli.Flag{
 			&cli.StringFlag{
-				Name:  "debug",
-				Usage: "Write debug logs to file",
+				Name:      "debug",
+				Aliases:   []string{"d"},
+				Usage:     "Write diagnostic logs to `FILE`",
+				TakesFile: true,
 			},
 			&cli.StringFlag{
-				Name:    "input",
-				Aliases: []string{"i"},
-				Usage:   "Path to input file (.log or .json)",
+				Name:      "input",
+				Aliases:   []string{"i"},
+				Usage:     "Compatibility alias for `FILE`",
+				Hidden:    true,
+				TakesFile: true,
 			},
 			&cli.StringFlag{
-				Name:  "filter-presets",
-				Usage: "Path to app-specific filter presets JSON (default: pluginlog-filters.json)",
+				Name:      "filter-presets",
+				Usage:     "Read filter presets from `FILE` (default: pluginlog-filters.json)",
+				Category:  "Configuration",
+				TakesFile: true,
 			},
 			&cli.StringFlag{
-				Name:  "filter-history",
-				Usage: "Path to writable filter history JSON (default: pluginlog-filter-history.json)",
-			},
-			&cli.BoolFlag{
-				Name:  "version",
-				Usage: "Print version and exit",
+				Name:      "filter-history",
+				Usage:     "Write filter history to `FILE` (default: pluginlog-filter-history.json)",
+				Category:  "Configuration",
+				TakesFile: true,
 			},
 		},
 	}
+}
 
-	_ = app.Run(context.Background(), os.Args)
+func resolveInputPath(c *cli.Command) (string, error) {
+	if c.Args().Present() {
+		return "", fmt.Errorf("unexpected argument %q", c.Args().First())
+	}
+	positional := c.StringArg("file")
+	compatibilityFlag := c.String("input")
+	if positional != "" && compatibilityFlag != "" {
+		return "", fmt.Errorf("use FILE or --input, not both")
+	}
+	if compatibilityFlag != "" {
+		return compatibilityFlag, nil
+	}
+	if positional == "" {
+		return "", fmt.Errorf("missing FILE")
+	}
+	return positional, nil
 }

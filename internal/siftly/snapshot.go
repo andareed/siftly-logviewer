@@ -246,6 +246,14 @@ func writeCompactSnapshot(w io.Writer, m *Model) error {
 			return fmt.Errorf("encode column layout: %w", err)
 		}
 	}
+	if wrapLines := snapshotColumnWrapLines(m.table.header); len(wrapLines) > 0 {
+		if err := writeLiteral(w, ",\n\"columnWrapLines\":"); err != nil {
+			return err
+		}
+		if err := writeJSONValue(w, wrapLines); err != nil {
+			return fmt.Errorf("encode column wrap lines: %w", err)
+		}
+	}
 	if err := writeLiteral(w, ",\n\"rows\":[\n"); err != nil {
 		return err
 	}
@@ -399,6 +407,21 @@ func (l *compactColumnLayout) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+func snapshotColumnWrapLines(header []ui.ColumnMeta) []int {
+	hasWrappedColumn := false
+	wrapLines := make([]int, len(header))
+	for i, column := range header {
+		wrapLines[i] = column.WrapLines
+		if column.WrapLines > 1 {
+			hasWrappedColumn = true
+		}
+	}
+	if !hasWrappedColumn {
+		return nil
+	}
+	return wrapLines
+}
+
 func snapshotTimeWindow(m *Model) *timeWindowDTO {
 	if !m.table.timeWindow.Enabled {
 		return nil
@@ -447,6 +470,7 @@ func loadModelFromReader(m *Model, r io.Reader) error {
 	version := legacySnapshotVersion
 	var header []ui.ColumnMeta
 	var columnLayouts []compactColumnLayout
+	var columnWrapLines []int
 	var rows []Row
 	var marked map[string]string
 	var comments map[string]string
@@ -488,6 +512,10 @@ func loadModelFromReader(m *Model, r io.Reader) error {
 			if err := dec.Decode(&columnLayouts); err != nil {
 				return fmt.Errorf("decode column layout: %w", err)
 			}
+		case "columnWrapLines":
+			if err := dec.Decode(&columnWrapLines); err != nil {
+				return fmt.Errorf("decode column wrap lines: %w", err)
+			}
 		case "rows":
 			rows, err = decodeSnapshotRows(dec, version)
 			if err != nil {
@@ -528,6 +556,9 @@ func loadModelFromReader(m *Model, r io.Reader) error {
 		if err := applyColumnLayouts(header, columnLayouts); err != nil {
 			return err
 		}
+	}
+	if err := applyColumnWrapLines(header, columnWrapLines); err != nil {
+		return err
 	}
 	if version == snapshotVersion {
 		if err := applyOriginalIndexSpans(rows, originalIndexSpans); err != nil {
@@ -591,6 +622,22 @@ func applyColumnLayouts(header []ui.ColumnMeta, layouts []compactColumnLayout) e
 			return fmt.Errorf("duplicate column source index %d", column.Index)
 		}
 		seen[column.Index] = struct{}{}
+	}
+	return nil
+}
+
+func applyColumnWrapLines(header []ui.ColumnMeta, wrapLines []int) error {
+	if len(wrapLines) == 0 {
+		return nil
+	}
+	if len(wrapLines) != len(header) {
+		return fmt.Errorf("column wrap line count %d does not match header count %d", len(wrapLines), len(header))
+	}
+	for i, lineLimit := range wrapLines {
+		if lineLimit < 0 {
+			return fmt.Errorf("column wrap lines at index %d must not be negative", i)
+		}
+		header[i].WrapLines = lineLimit
 	}
 	return nil
 }

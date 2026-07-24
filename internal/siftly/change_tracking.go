@@ -15,13 +15,14 @@ const (
 )
 
 type trackedColumn struct {
-	Name     string
-	Index    int
-	Role     ui.ColumnRole
-	Visible  bool
-	Frozen   bool
-	MinWidth int
-	Weight   float64
+	Name      string
+	Index     int
+	Role      ui.ColumnRole
+	Visible   bool
+	Frozen    bool
+	MinWidth  int
+	Weight    float64
+	WrapLines int
 }
 
 type trackedState struct {
@@ -56,7 +57,7 @@ type changeTracker struct {
 	recoverySeq          int
 	pendingRecoveryCmd   tea.Cmd
 	recoveryPathOverride string
-	recoveredOnStart     bool
+	pendingRecovery      *pendingRecovery
 }
 
 func (m *Model) initializeChangeTracking() {
@@ -75,13 +76,14 @@ func (m *Model) captureTrackedState() trackedState {
 	columns := make([]trackedColumn, len(m.table.header))
 	for i, column := range m.table.header {
 		columns[i] = trackedColumn{
-			Name:     column.Name,
-			Index:    column.Index,
-			Role:     column.Role,
-			Visible:  column.Visible,
-			Frozen:   column.Frozen,
-			MinWidth: column.MinWidth,
-			Weight:   column.Weight,
+			Name:      column.Name,
+			Index:     column.Index,
+			Role:      column.Role,
+			Visible:   column.Visible,
+			Frozen:    column.Frozen,
+			MinWidth:  column.MinWidth,
+			Weight:    column.Weight,
+			WrapLines: column.WrapLines,
 		}
 	}
 	return trackedState{
@@ -182,16 +184,25 @@ func (m *Model) redoLastChange() tea.Cmd {
 func (m *Model) restoreTrackedState(state trackedState, refresh bool) {
 	currentRowID := m.currentRowHashID()
 	m.view.columnScrollOffset = 0
+	currentWrapLines := make(map[int]int, len(m.table.header))
+	for _, column := range m.table.header {
+		currentWrapLines[column.Index] = column.WrapLines
+	}
 	m.table.header = make([]ui.ColumnMeta, len(state.Columns))
 	for i, column := range state.Columns {
+		wrapLines := column.WrapLines
+		if wrapLines == 0 {
+			wrapLines = currentWrapLines[column.Index]
+		}
 		m.table.header[i] = ui.ColumnMeta{
-			Name:     column.Name,
-			Index:    column.Index,
-			Role:     column.Role,
-			Visible:  column.Visible,
-			Frozen:   column.Frozen,
-			MinWidth: column.MinWidth,
-			Weight:   column.Weight,
+			Name:      column.Name,
+			Index:     column.Index,
+			Role:      column.Role,
+			Visible:   column.Visible,
+			Frozen:    column.Frozen,
+			MinWidth:  column.MinWidth,
+			Weight:    column.Weight,
+			WrapLines: wrapLines,
 		}
 	}
 	m.table.markedRows = cloneMarkMap(state.MarkedRows)

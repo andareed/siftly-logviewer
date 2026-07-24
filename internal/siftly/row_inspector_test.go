@@ -13,7 +13,7 @@ func TestRowInspectorIncludesCompleteRowMetadataAndReorderedFields(t *testing.T)
 	const longMessage = "fstool_va request continued onto another display line with sequence 48291"
 	row := Row{
 		ID:            42,
-		Cols:          []string{"2026-07-21T09:30:00Z", "nascent", longMessage},
+		Cols:          []string{"2026-07-21T09:30:00Z", "example-host", longMessage},
 		OriginalIndex: 117,
 	}
 	m := Model{
@@ -42,7 +42,7 @@ func TestRowInspectorIncludesCompleteRowMetadataAndReorderedFields(t *testing.T)
 		"timestamp",
 		"2026-07-21T09:30:00Z",
 		"host",
-		"nascent",
+		"example-host",
 	} {
 		if !strings.Contains(normalizedContent, strings.Join(strings.Fields(want), " ")) {
 			t.Fatalf("inspector content missing %q:\n%s", want, content)

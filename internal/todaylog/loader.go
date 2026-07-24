@@ -60,6 +60,7 @@ func newModelFromJSONFile(path string) (*siftly.Model, error) {
 
 func configureTodaylogModel(m *siftly.Model, path string) {
 	m.InitialPath = path
+	m.ApplyColumnSchema(todaylogColumnSchema())
 	m.SetStyles(SiftlyStyles())
 	m.SetGraphConfig(siftly.GraphConfig{
 		Enabled:      true,

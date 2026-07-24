@@ -53,12 +53,10 @@ const (
 	viewActionScrollLeft
 	viewActionScrollRight
 	viewActionSave
-	viewActionReloadFull
 )
 
 const (
-	fullReloadConfirmWindow = 10 * time.Second
-	quitConfirmWindow       = 10 * time.Second
+	quitConfirmWindow = 10 * time.Second
 )
 
 type viewPrefixAction int
@@ -112,10 +110,6 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if action != viewActionQuit && action != viewActionCancelQuit {
 		m.view.quitConfirmUntil = time.Time{}
 	}
-	if action != viewActionReloadFull {
-		m.view.reloadFullConfirmUntil = time.Time{}
-	}
-
 	switch action {
 	case viewActionOpenColumnManager:
 		return m, m.openColumnManager()
@@ -261,8 +255,6 @@ func (m *Model) handleViewModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewActionSave:
 		m.openSaveDialog()
 		return m, nil
-	case viewActionReloadFull:
-		return m, m.confirmOrReloadFullSource()
 	}
 
 	//TODO: DON'T THINK WE SHOULD BE RENDERING TABLE EVERY TIME TBH
@@ -352,8 +344,6 @@ func (m *Model) resolveViewAction(msg tea.KeyMsg) viewAction {
 		return viewActionScrollRight
 	case key.Matches(msg, Keys.SaveToFile):
 		return viewActionSave
-	case key.Matches(msg, Keys.ReloadFull):
-		return viewActionReloadFull
 	default:
 		return viewActionNone
 	}
@@ -379,21 +369,6 @@ func (m *Model) confirmOrQuit() tea.Cmd {
 
 func (m *Model) quitConfirmationActive() bool {
 	return !m.view.quitConfirmUntil.IsZero() && time.Now().Before(m.view.quitConfirmUntil)
-}
-
-func (m *Model) confirmOrReloadFullSource() tea.Cmd {
-	if !m.CanReloadFullSource() {
-		return m.view.notice.Start("No prefiltered source to reload", "warn", noticeDuration)
-	}
-
-	now := time.Now()
-	if now.After(m.view.reloadFullConfirmUntil) {
-		m.view.reloadFullConfirmUntil = now.Add(fullReloadConfirmWindow)
-		return m.view.notice.Start("Press R again to load full dataset; this may take several seconds", "warn", 5*time.Second)
-	}
-
-	m.view.reloadFullConfirmUntil = time.Time{}
-	return m.startFullSourceReloadOperation()
 }
 
 func (m *Model) handleViewPrefixKey(msg tea.KeyMsg) (handled bool, cmd tea.Cmd, refresh bool) {

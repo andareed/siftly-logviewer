@@ -22,8 +22,8 @@ func TestCommandCatalogHasUniqueExecutableEntries(t *testing.T) {
 		if item.ID == "" || item.Category == "" || item.Title == "" || item.Shortcut == "" {
 			t.Fatalf("incomplete command item: %+v", item)
 		}
-		if len(command.sequence) == 0 {
-			t.Fatalf("command %q has no executable key sequence", item.ID)
+		if len(command.sequence) == 0 && command.execute == nil {
+			t.Fatalf("command %q has no executable action", item.ID)
 		}
 		if _, exists := seen[item.ID]; exists {
 			t.Fatalf("duplicate command ID %q", item.ID)
@@ -65,6 +65,7 @@ func TestCommandCatalogUsesExistingPrefixSequences(t *testing.T) {
 		commandExportData:    {"e", "d"},
 		commandExportGraph:   {"e", "g"},
 		commandFilterPresets: {"f", "ctrl+p"},
+		commandFilterHistory: {"f", "ctrl+r"},
 	}
 
 	for _, command := range m.commandCatalog() {
@@ -84,6 +85,24 @@ func TestCommandCatalogUsesExistingPrefixSequences(t *testing.T) {
 	}
 	for id := range tests {
 		t.Fatalf("command catalog omits sequence test for %q", id)
+	}
+}
+
+func TestFullSourceReloadRunsOnlyThroughPaletteCommand(t *testing.T) {
+	m := newChangeTrackingTestModel()
+	m.SetFullSourceReload(func() (*Model, error) {
+		return newChangeTrackingTestModel(), nil
+	})
+
+	if action := m.resolveViewAction(tea.KeyMsg{Type: tea.KeyCtrlR}); action != viewActionNone {
+		t.Fatalf("normal-mode ctrl+r action = %v, want none", action)
+	}
+	cmd := m.runPaletteCommand(commandReloadFullSource)
+	if cmd == nil {
+		t.Fatal("reload palette command should start the reload operation")
+	}
+	if !m.view.operation.active {
+		t.Fatal("reload palette command did not activate the operation")
 	}
 }
 

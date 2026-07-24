@@ -96,6 +96,7 @@ func (m *Model) recomputeLayout(height int, width int) {
 	m.viewport.Width = viewportWidth
 	m.viewport.SetXOffset(0)
 	m.table.header = ui.LayoutColumns(m.table.header, max(1, viewportWidth-m.tableMarkerWidth()))
+	m.view.rowHeights = nil
 	m.clampColumnScrollOffset()
 }
 

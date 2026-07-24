@@ -10,6 +10,7 @@ import (
 type paletteCommandSpec struct {
 	item     dialogs.CommandItem
 	sequence []tea.KeyMsg
+	execute  func() tea.Cmd
 }
 
 const (
@@ -81,6 +82,20 @@ func (m *Model) commandCatalog() []paletteCommandSpec {
 			sequence: sequence,
 		})
 	}
+	addDirect := func(id, category, title, shortcut, description, keywords string, execute func() tea.Cmd) {
+		commands = append(commands, paletteCommandSpec{
+			item: dialogs.CommandItem{
+				ID:          id,
+				Category:    category,
+				Title:       title,
+				Shortcut:    shortcut,
+				Description: description,
+				Keywords:    keywords,
+				Enabled:     true,
+			},
+			execute: execute,
+		})
+	}
 	disable := func(id, reason string) {
 		for i := range commands {
 			if commands[i].item.ID == id {
@@ -124,7 +139,7 @@ func (m *Model) commandCatalog() []paletteCommandSpec {
 	add(commandFilter, "Search and Filter", "Filter rows by regular expression", "f", "Restrict displayed rows using whole-row matching", "regex", runeKey('f'))
 	add(commandFilterToggle, "Search and Filter", "Toggle current filter", "F", "Enable or disable the configured filter", "show hide", runeKey('F'))
 	add(commandFilterPresets, "Search and Filter", "Open filter presets", "f Ctrl+P", "Choose or search configured filter presets", "saved filters", runeKey('f'), keyType(tea.KeyCtrlP))
-	add(commandFilterHistory, "Search and Filter", "Open filter history", "f Ctrl+H", "Choose or search previously used filters", "recent filters", runeKey('f'), keyType(tea.KeyCtrlH))
+	add(commandFilterHistory, "Search and Filter", "Open filter history", "f Ctrl+R / Up", "Choose or search previously used filters", "recent filters", runeKey('f'), keyType(tea.KeyCtrlR))
 	if strings.TrimSpace(m.view.searchQuery) == "" {
 		disable(commandSearchNext, "No active search")
 		disable(commandSearchPrevious, "No active search")
@@ -197,7 +212,7 @@ func (m *Model) commandCatalog() []paletteCommandSpec {
 		add(commandExportGraph, "Output and Data", "Export graph SVG", "e g", "Write the current graph to a timestamped SVG", "chart plot image", runeKey('e'), runeKey('g'))
 	}
 	if m.CanReloadFullSource() {
-		add(commandReloadFullSource, "Output and Data", "Reload full source data", "Ctrl+R", "Replace prefiltered data with the complete source", "refresh load", keyType(tea.KeyCtrlR))
+		addDirect(commandReloadFullSource, "Output and Data", "Reload full source data", "Palette only", "Replace prefiltered data with the complete source", "refresh load", m.startFullSourceReloadOperation)
 	}
 
 	return commands
@@ -223,6 +238,9 @@ func (m *Model) runPaletteCommand(id string) tea.Cmd {
 				message = "Command is unavailable"
 			}
 			return m.view.notice.Start(message, "warn", noticeDuration)
+		}
+		if command.execute != nil {
+			return command.execute()
 		}
 		commands := make([]tea.Cmd, 0, len(command.sequence))
 		for _, keyMsg := range command.sequence {

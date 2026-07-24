@@ -25,6 +25,28 @@ func TestRenderRowCellsCompactsMultilineValuesToOneLine(t *testing.T) {
 	}
 }
 
+func TestRenderRowCellsWrapsEnabledColumnWithinLineBudget(t *testing.T) {
+	got, height := RenderRowCells(
+		[]string{"alpha\nbeta gamma delta epsilon"},
+		[]ColumnMeta{{Index: 0, Visible: true, Width: 12, WrapLines: 2}},
+		lipgloss.NewStyle().Padding(0, 1),
+	)
+	if height != 2 {
+		t.Fatalf("wrapped row height=%d want 2: %q", height, got)
+	}
+	if !strings.Contains(got, "\n") || strings.Contains(got, "↵") {
+		t.Fatalf("wrapped row should preserve visual lines without a line-break marker: %q", got)
+	}
+	if !strings.Contains(got, "…") {
+		t.Fatalf("wrapped row should signal content beyond its line budget: %q", got)
+	}
+	for i, line := range strings.Split(got, "\n") {
+		if width := lipgloss.Width(line); width != 12 {
+			t.Fatalf("wrapped line %d width=%d want 12 (%q)", i, width, line)
+		}
+	}
+}
+
 func TestRepeatedCellEmphasisYieldsToSelectionAndSearch(t *testing.T) {
 	previousProfile := lipgloss.ColorProfile()
 	lipgloss.SetColorProfile(termenv.TrueColor)

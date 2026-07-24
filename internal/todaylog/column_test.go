@@ -16,6 +16,9 @@ func TestTodaylogColumnLayoutPrioritisesKey(t *testing.T) {
 	if key.MinWidth < 40 || key.Weight <= value.Weight {
 		t.Fatalf("key layout must dominate value: key=%+v value=%+v", key, value)
 	}
+	if key.WrapLines != 4 || value.WrapLines != 0 {
+		t.Fatalf("key should wrap while value remains dense: key=%+v value=%+v", key, value)
+	}
 
 	minWidth := 0
 	for _, name := range todaylogHeader {

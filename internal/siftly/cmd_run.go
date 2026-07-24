@@ -125,7 +125,7 @@ func (m *Model) handleCommandKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+p":
 			return m, m.openFilterPalette(false)
-		case "ctrl+h":
+		case "ctrl+r", "up":
 			return m, m.openFilterPalette(true)
 		}
 	}

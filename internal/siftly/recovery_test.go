@@ -8,10 +8,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/andareed/siftly-hostlog/internal/siftly/features/dialogs"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestRecoverySnapshotRestoresOnlyAgainstIdenticalSource(t *testing.T) {
+func TestRecoverySnapshotPromptsAndRestoresOnlyAfterConfirmation(t *testing.T) {
 	dir := t.TempDir()
 	sourcePath := filepath.Join(dir, "source.csv")
 	recoveryPath := filepath.Join(dir, "recovery.json")
@@ -45,8 +47,25 @@ func TestRecoverySnapshotRestoresOnlyAgainstIdenticalSource(t *testing.T) {
 
 	reopened := newRecoveryTestModel(sourcePath, recoveryPath)
 	rowID := reopened.table.rows[0].ID
-	if !reopened.changes.recoveredOnStart || !reopened.dirty {
-		t.Fatalf("recovery was not applied: recovered=%t dirty=%t", reopened.changes.recoveredOnStart, reopened.dirty)
+	if reopened.changes.pendingRecovery == nil {
+		t.Fatal("matching recovery should be held pending")
+	}
+	if reopened.dirty {
+		t.Fatal("finding recovery must not make the newly opened model dirty")
+	}
+	if reopened.table.markedRows[rowID] != ui.MarkNone || reopened.table.commentRows[rowID] != "" {
+		t.Fatal("recovery was applied before user confirmation")
+	}
+	if _, ok := reopened.activeDialog.(*dialogs.Recovery); !ok {
+		t.Fatalf("startup dialog = %T, want recovery prompt", reopened.activeDialog)
+	}
+
+	cmd, handled := reopened.handleDialogInput(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	if !handled || cmd == nil {
+		t.Fatalf("restore key handled=%t cmd=%v", handled, cmd != nil)
+	}
+	if reopened.changes.pendingRecovery != nil || !reopened.dirty {
+		t.Fatalf("recovery was not applied after confirmation: pending=%t dirty=%t", reopened.changes.pendingRecovery != nil, reopened.dirty)
 	}
 	if reopened.table.markedRows[rowID] != ui.MarkRed || reopened.table.commentRows[rowID] != "needs investigation" {
 		t.Fatalf("annotations were not recovered: mark=%q comment=%q", reopened.table.markedRows[rowID], reopened.table.commentRows[rowID])
@@ -65,11 +84,113 @@ func TestRecoverySnapshotRestoresOnlyAgainstIdenticalSource(t *testing.T) {
 		t.Fatal(err)
 	}
 	stale := newRecoveryTestModel(sourcePath, recoveryPath)
-	if stale.changes.recoveredOnStart || stale.dirty {
+	if stale.changes.pendingRecovery != nil || stale.dirty {
 		t.Fatal("recovery should be rejected after the backend source changes")
 	}
 	if _, err := os.Stat(recoveryPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("stale recovery was not removed: %v", err)
+	}
+}
+
+func TestRecoveryPathIsHiddenAndAdjacentToOpenedFile(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "today.log")
+	if err := os.WriteFile(sourcePath, []byte("source"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	m := &Model{InitialPath: sourcePath}
+
+	path, err := m.recoveryFilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(dir, ".today.log.siftly-recovery-"+recoveryOwnerToken()+".json")
+	if path != want {
+		t.Fatalf("recovery path = %q, want %q", path, want)
+	}
+}
+
+func TestDiscardRecoveryKeepsModelCleanAndRemovesSidecar(t *testing.T) {
+	dir := t.TempDir()
+	sourcePath := filepath.Join(dir, "source.csv")
+	recoveryPath := filepath.Join(dir, ".source.csv.siftly-recovery-"+recoveryOwnerToken()+".json")
+	if err := os.WriteFile(sourcePath, []byte("first,second\nunique-row-payload,2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	original := newRecoveryTestModel(sourcePath, recoveryPath)
+	original.markCurrent(ui.MarkAmber)
+	if err := original.writeRecoverySnapshotNow(); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened := newRecoveryTestModel(sourcePath, recoveryPath)
+	if reopened.changes.pendingRecovery == nil {
+		t.Fatal("matching recovery should be held pending")
+	}
+	cmd, handled := reopened.handleDialogInput(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if !handled || cmd == nil {
+		t.Fatalf("discard key handled=%t cmd=%v", handled, cmd != nil)
+	}
+	if reopened.dirty || reopened.changes.pendingRecovery != nil {
+		t.Fatalf("discard left dirty=%t pending=%t", reopened.dirty, reopened.changes.pendingRecovery != nil)
+	}
+	if len(reopened.table.markedRows) != 0 {
+		t.Fatalf("discard applied recovered marks: %#v", reopened.table.markedRows)
+	}
+	if _, err := os.Stat(recoveryPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("discard left recovery sidecar: %v", err)
+	}
+}
+
+func TestLegacyCacheRecoveryMigratesToAdjacentSidecar(t *testing.T) {
+	dir := t.TempDir()
+	t.Setenv("XDG_CACHE_HOME", filepath.Join(dir, "cache"))
+	sourcePath := filepath.Join(dir, "source.csv")
+	if err := os.WriteFile(sourcePath, []byte("first,second\nunique-row-payload,2\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	original := newRecoveryTestModel(sourcePath, "")
+	original.markCurrent(ui.MarkGreen)
+	snapshot, err := original.buildRecoverySnapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyPath, err := original.legacyRecoveryFilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeRecoveryFile(legacyPath, snapshot); err != nil {
+		t.Fatal(err)
+	}
+
+	reopened := newRecoveryTestModel(sourcePath, "")
+	sidecarPath, err := reopened.recoveryFilePath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reopened.changes.pendingRecovery == nil {
+		t.Fatal("legacy recovery was not offered to the user")
+	}
+	if reopened.changes.pendingRecovery.path != sidecarPath {
+		t.Fatalf("pending recovery path = %q, want migrated sidecar %q", reopened.changes.pendingRecovery.path, sidecarPath)
+	}
+	if _, err := os.Stat(sidecarPath); err != nil {
+		t.Fatalf("migrated sidecar: %v", err)
+	}
+	if _, err := os.Stat(legacyPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy recovery was not removed after migration: %v", err)
+	}
+	info, err := os.Stat(sidecarPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("sidecar permissions = %o, want 600", info.Mode().Perm())
 	}
 }
 
@@ -138,7 +259,9 @@ func newRecoveryTestModel(sourcePath, recoveryPath string) *Model {
 			searchColumns:   []int{0, 1},
 		},
 	}
-	m.SetRecoveryPath(recoveryPath)
+	if recoveryPath != "" {
+		m.SetRecoveryPath(recoveryPath)
+	}
 	m.InitialiseView()
 	m.applyFilter()
 	return m

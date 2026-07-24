@@ -34,8 +34,9 @@ func pluginlogColumnSchema() siftly.ColumnSchema {
 		RoleForName:     detectRole,
 		RoleDefaults: map[ui.ColumnRole]siftly.RoleLayout{
 			RolePrimary: {
-				MinWidth: 44,
-				Weight:   1.0,
+				MinWidth:  44,
+				Weight:    1.0,
+				WrapLines: 4,
 			},
 			RoleSecondary: {
 				MinWidth: 12,
@@ -76,8 +77,9 @@ func pluginlogColumnSchema() siftly.ColumnSchema {
 				Weight:   0.0,
 			},
 			"message": {
-				MinWidth: 44,
-				Weight:   1.0,
+				MinWidth:  44,
+				Weight:    1.0,
+				WrapLines: 4,
 			},
 		},
 	}

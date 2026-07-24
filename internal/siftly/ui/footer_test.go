@@ -91,7 +91,7 @@ func TestRenderFooterDropsWholeHintsAtNarrowWidths(t *testing.T) {
 		ModeLabel:   "FILTER",
 		IsInputMode: true,
 		Prompt:      "filter: fstool_va.*seq",
-		Hints:       "enter: apply   ctrl+p: presets   ctrl+h: history   esc: cancel",
+		Hints:       "enter: apply   ctrl+p: presets   ctrl+r/up: history   esc: cancel",
 	}, DefaultFooterStyles()))
 
 	actionLine := strings.Split(out, "\n")[1]

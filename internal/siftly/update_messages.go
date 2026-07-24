@@ -113,6 +113,23 @@ func (m *Model) openExportDialog() {
 	m.activeDialog.Show()
 }
 
+func (m *Model) openRecoveryDialog() {
+	pending := m.changes.pendingRecovery
+	if pending == nil {
+		return
+	}
+	dialog := dialogs.NewRecoveryDialog(
+		pending.sourceName,
+		pending.savedAt,
+		pending.contents,
+		m.terminalWidth,
+		m.terminalHeight,
+		m.styles.ResolvedTokens(),
+	)
+	m.activeDialog = dialog
+	m.activeDialog.Show()
+}
+
 func (m *Model) hideActiveDialog() {
 	if m.activeDialog != nil {
 		m.activeDialog.Hide()
@@ -169,6 +186,14 @@ func (m *Model) applyDialogAction(action dialogs.Action) tea.Cmd {
 	case dialogs.ActionColumnManagerCancel:
 		m.hideActiveDialog()
 		return nil
+	case dialogs.ActionRecoveryRestore:
+		m.hideActiveDialog()
+		return m.restorePendingRecovery()
+	case dialogs.ActionRecoveryDiscard:
+		m.hideActiveDialog()
+		return m.discardPendingRecovery()
+	case dialogs.ActionRecoveryQuit:
+		return tea.Quit
 	default:
 		return nil
 	}

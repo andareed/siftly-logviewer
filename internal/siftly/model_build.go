@@ -13,7 +13,7 @@ import (
 )
 
 // ColumnSchema defines how column names map to roles and how layout defaults are applied.
-// Resolution order for min-width/weight:
+// Resolution order for min-width/weight/wrapped-line budget:
 // 1) DefaultMinWidth/DefaultWeight
 // 2) RoleDefaults[role]
 // 3) ColumnDefaults[normalized-column-name]
@@ -27,8 +27,9 @@ type ColumnSchema struct {
 }
 
 type RoleLayout struct {
-	MinWidth int
-	Weight   float64
+	MinWidth  int
+	Weight    float64
+	WrapLines int // 0 inherits, 1 stays dense, values above 1 enable bounded wrapping
 }
 
 type modelBuilder struct {
@@ -192,6 +193,7 @@ func buildColumnMeta(rawHeader []string, schema ColumnSchema) []ui.ColumnMeta {
 		role := roleFn(name)
 		minWidth := defMin
 		weight := defWeight
+		wrapLines := 1
 
 		if layout, ok := schema.RoleDefaults[role]; ok {
 			if layout.MinWidth > 0 {
@@ -199,6 +201,9 @@ func buildColumnMeta(rawHeader []string, schema ColumnSchema) []ui.ColumnMeta {
 			}
 			if layout.Weight > 0 {
 				weight = layout.Weight
+			}
+			if layout.WrapLines > 0 {
+				wrapLines = layout.WrapLines
 			}
 		}
 
@@ -210,19 +215,40 @@ func buildColumnMeta(rawHeader []string, schema ColumnSchema) []ui.ColumnMeta {
 			if layout.Weight > 0 {
 				weight = layout.Weight
 			}
+			if layout.WrapLines > 0 {
+				wrapLines = layout.WrapLines
+			}
 		}
 
 		cols[i] = ui.ColumnMeta{
-			Name:     name,
-			Index:    i,
-			Role:     role,
-			Visible:  true,
-			MinWidth: minWidth,
-			Weight:   weight,
+			Name:      name,
+			Index:     i,
+			Role:      role,
+			Visible:   true,
+			MinWidth:  minWidth,
+			Weight:    weight,
+			WrapLines: wrapLines,
 		}
 	}
 
 	return cols
+}
+
+// ApplyColumnSchema refreshes schema-owned column semantics without replacing
+// user-managed visibility, ordering, freezing, or sizing from a saved session.
+func (m *Model) ApplyColumnSchema(schema ColumnSchema) {
+	if m == nil || len(m.table.header) == 0 {
+		return
+	}
+	names := make([]string, len(m.table.header))
+	for i := range m.table.header {
+		names[i] = m.table.header[i].Name
+	}
+	defaults := buildColumnMeta(names, schema)
+	for i := range m.table.header {
+		m.table.header[i].Role = defaults[i].Role
+		m.table.header[i].WrapLines = defaults[i].WrapLines
+	}
 }
 
 func (b *modelBuilder) addRow(source []string, originalIndex int, copyCols bool) {

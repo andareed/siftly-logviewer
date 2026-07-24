@@ -64,7 +64,7 @@ func renderColumnCells(cols []string, colsMeta []ColumnMeta, style lipgloss.Styl
 		}
 		text := ""
 		if meta.Index >= 0 && meta.Index < len(cols) {
-			text = singleLineCellText(cols[meta.Index])
+			text = normalizedCellText(cols[meta.Index], meta.WrapLines > 1)
 		}
 		if strings.TrimSpace(options.searchQuery) != "" {
 			text = highlightMatches(text, options.searchQuery, options.searchStyle)
@@ -73,11 +73,17 @@ func renderColumnCells(cols []string, colsMeta []ColumnMeta, style lipgloss.Styl
 		if textWidth < 1 {
 			textWidth = 1
 		}
-		text = xansi.Truncate(text, textWidth, "…")
+		lineLimit := 1
+		if meta.WrapLines > 1 {
+			lineLimit = meta.WrapLines
+			text = limitWrappedCellText(xansi.Wrap(text, textWidth, ""), textWidth, lineLimit)
+		} else {
+			text = xansi.Truncate(text, textWidth, "…")
+		}
 		if meta.Index >= 0 && meta.Index < len(options.repeatedCols) && options.repeatedCols[meta.Index] {
 			text = options.repeatedCell.Render(text)
 		}
-		rendered = append(rendered, style.Width(meta.Width).MaxHeight(1).Render(text))
+		rendered = append(rendered, style.Width(meta.Width).MaxHeight(lineLimit).Render(text))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Top, rendered...)
 }
@@ -147,11 +153,32 @@ func RenderRow(in RowRenderInput) (string, int) {
 	return strings.Join(lines, "\n"), rowHeight
 }
 
-func singleLineCellText(value string) string {
+func normalizedCellText(value string, preserveLines bool) string {
 	value = strings.ReplaceAll(value, "\r\n", "\n")
 	value = strings.ReplaceAll(value, "\r", "\n")
 	value = strings.ReplaceAll(value, "\t", " ")
+	if preserveLines {
+		return value
+	}
 	return strings.ReplaceAll(value, "\n", " ↵ ")
+}
+
+func singleLineCellText(value string) string {
+	return normalizedCellText(value, false)
+}
+
+func limitWrappedCellText(value string, width, lineLimit int) string {
+	lines := strings.Split(value, "\n")
+	if lineLimit < 1 || len(lines) <= lineLimit {
+		return value
+	}
+	lines = lines[:lineLimit]
+	if width <= 1 {
+		lines[lineLimit-1] = "…"
+	} else {
+		lines[lineLimit-1] = xansi.Truncate(lines[lineLimit-1], width-1, "") + "…"
+	}
+	return strings.Join(lines, "\n")
 }
 
 func resolveRowVisualStyle(styles RowStyles, cursor, rangeSelected bool) (lipgloss.Style, lipgloss.Color, lipgloss.Color) {

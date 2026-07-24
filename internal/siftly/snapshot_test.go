@@ -98,18 +98,26 @@ func TestSaveModelPreservesReorderedFrozenColumnSourceIndices(t *testing.T) {
 	}
 	m.table.header = []ui.ColumnMeta{m.table.header[2], m.table.header[0], m.table.header[1]}
 	m.table.header[0].Frozen = true
+	m.table.header[0].WrapLines = 4
 	m.table.header[1].Visible = false
 
 	path := filepath.Join(t.TempDir(), "reordered.json")
 	if err := SaveModel(m, path); err != nil {
 		t.Fatalf("SaveModel: %v", err)
 	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read snapshot: %v", err)
+	}
+	if !strings.Contains(string(data), `"columnWrapLines":[4,1,1]`) {
+		t.Fatalf("snapshot missing compact wrapped-line metadata: %s", data)
+	}
 
 	var reopened Model
 	if err := LoadModel(&reopened, path); err != nil {
 		t.Fatalf("LoadModel: %v", err)
 	}
-	if got := reopened.table.header[0]; got.Name != "third" || got.Index != 2 || !got.Frozen {
+	if got := reopened.table.header[0]; got.Name != "third" || got.Index != 2 || !got.Frozen || got.WrapLines != 4 {
 		t.Fatalf("reopened first column = %+v", got)
 	}
 	if got := reopened.table.header[1]; got.Name != "first" || got.Index != 0 || got.Visible {
@@ -129,6 +137,21 @@ func TestCompactColumnLayoutAcceptsLegacyFourValueForm(t *testing.T) {
 	}
 	if layout.Frozen || layout.hasIndex || layout.MinWidth != 8 || layout.Weight != 1 {
 		t.Fatalf("legacy column layout = %+v", layout)
+	}
+}
+
+func TestApplyColumnWrapLinesValidatesAndAppliesBudget(t *testing.T) {
+	t.Parallel()
+
+	header := []ui.ColumnMeta{{Name: "first"}, {Name: "details"}}
+	if err := applyColumnWrapLines(header, []int{1, 4}); err != nil {
+		t.Fatalf("apply wrapped lines: %v", err)
+	}
+	if header[0].WrapLines != 1 || header[1].WrapLines != 4 {
+		t.Fatalf("wrapped header = %+v", header)
+	}
+	if err := applyColumnWrapLines(header, []int{4}); err == nil {
+		t.Fatal("mismatched wrapped-line metadata should fail")
 	}
 }
 

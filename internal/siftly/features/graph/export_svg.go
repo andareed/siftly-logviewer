@@ -16,10 +16,10 @@ type ExportOptions struct {
 
 func ExportSVG(in Input, opts ExportOptions) ([]byte, error) {
 	if opts.Width <= 0 {
-		opts.Width = 1400
+		opts.Width = 1920
 	}
 	if opts.Height <= 0 {
-		opts.Height = 820
+		opts.Height = 1080
 	}
 	if opts.Width < 720 {
 		opts.Width = 720

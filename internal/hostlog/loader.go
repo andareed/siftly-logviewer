@@ -31,8 +31,7 @@ func newModelFromJSONFile(path string) (*siftly.Model, error) {
 	if err := siftly.LoadModel(m, path); err != nil {
 		return nil, err
 	}
-	m.InitialPath = path
-	m.SetStyles(SiftlyStyles())
+	configureHostlogModel(m, path)
 	m.InitialiseView()
 	return m, nil
 }
@@ -50,8 +49,13 @@ func newModelFromCSVFile(path string) (*siftly.Model, error) {
 	if err != nil {
 		return nil, err
 	}
-	m.InitialPath = path
-	m.SetStyles(SiftlyStyles())
+	configureHostlogModel(m, path)
 	m.InitialiseView()
 	return m, nil
+}
+
+func configureHostlogModel(m *siftly.Model, path string) {
+	m.InitialPath = path
+	m.ApplyColumnSchema(hostlogColumnSchema())
+	m.SetStyles(SiftlyStyles())
 }

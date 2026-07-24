@@ -1,6 +1,6 @@
 # Siftly How-To Guide
 
-This guide covers the shared interface used by `hostlog`, `todaylog`, `pluginlog`, and the interactive `devfmt export` view. Commands that depend on an application feature, such as the `todaylog` graph, appear in help only when that feature is available.
+This guide covers the shared interface used by `hostlog`, `todaylog`, and `pluginlog`. Commands that depend on an application feature, such as the `todaylog` graph, appear in help only when that feature is available.
 
 ## Start An Application
 
@@ -11,7 +11,6 @@ mkdir -p dist
 go build -o dist/hostlog ./cmd/hostlog
 go build -o dist/todaylog ./cmd/todaylog
 go build -o dist/pluginlog ./cmd/pluginlog
-go build -o dist/devfmt ./cmd/devfmt
 ```
 
 Open source data or a saved Siftly JSON snapshot:
@@ -20,17 +19,16 @@ Open source data or a saved Siftly JSON snapshot:
 ./dist/hostlog testdata/hostlog.csv
 ./dist/todaylog /path/to/today.log
 ./dist/pluginlog /path/to/plugin.log
-./dist/devfmt export --input /path/to/devinfo.dump.gz --group sw
 ```
 
-Use `--debug debug.log` when diagnostic logging is needed. The application writes relative `--filter-presets` and `--filter-history` paths in the directory from which it was launched.
+Use `-d debug.log` when diagnostic logging is needed. The application writes relative `--filter-presets` and `--filter-history` paths in the directory from which it was launched.
 
 ## Read The Interface
 
 ![Main table view with row inspector](docs/sample-view.png)
 
 - The framed table header shows the input filename, current displayed row count, active filter, marks-only state, and selection count.
-- Rows remain single-line for scanning. Open the row inspector with `Enter` when a complete value is needed.
+- Ordinary columns remain single-line for scanning while primary content columns can wrap to four lines. Open the row inspector with `Enter` when a complete value is needed.
 - The first footer line shows the current mode and active states. The second line changes its key hints to match the current mode, prefix, selection, or inspector.
 - Notices and long-running operation progress appear at the right of the footer.
 
@@ -72,9 +70,9 @@ The footer reports the current match position, such as `Match 4/127`.
 
 Filtering matches one complete logical row, including all columns, so expressions such as `fstool_va.*seq` work across column boundaries without requiring users to enable a multiline regular-expression mode.
 
-While entering a filter, use `Ctrl+P` for configured presets or `Ctrl+H` for filter history. The history file is writable state; set `--filter-history /path/to/history.json` when the launch directory is not an appropriate location.
+While entering a filter, use `Ctrl+P` for configured presets or `Ctrl+R`/`Up` for filter history. The history file is writable state; set `--filter-history /path/to/history.json` when the launch directory is not an appropriate location.
 
-For very large raw today logs, `--prefilter REGEX` reduces data before parsing. This is deliberately separate from the interactive filter. Use `Ctrl+R` to reload the complete source.
+For very large raw today logs, `--prefilter REGEX` reduces data before parsing. This is deliberately separate from the interactive filter. Use the command palette to reload the complete source.
 
 ## Select, Copy, And Mark Rows
 

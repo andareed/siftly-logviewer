@@ -165,7 +165,7 @@ func TestCommandInputCtrlVReturnsPasteCommand(t *testing.T) {
 	}
 }
 
-func TestFilterCommandCtrlHOpensHistoryPalette(t *testing.T) {
+func TestFilterCommandCtrlRAndUpOpenHistoryPalette(t *testing.T) {
 	dir := t.TempDir()
 	historyPath := filepath.Join(dir, "history.json")
 	if err := os.WriteFile(historyPath, []byte(`{"history":["history-pattern","older-pattern"]}`), 0o644); err != nil {
@@ -182,19 +182,25 @@ func TestFilterCommandCtrlHOpensHistoryPalette(t *testing.T) {
 		HistoryPath:    historyPath,
 	})
 
-	_, cmd := m.handleCommandKey(tea.KeyMsg{Type: tea.KeyCtrlH})
-	if cmd != nil {
-		t.Fatalf("ctrl+h should open history palette without returning a command")
-	}
-	if m.activeDialog == nil || !m.activeDialog.IsVisible() {
-		t.Fatalf("ctrl+h should open the filter palette")
-	}
+	for _, keyMsg := range []tea.KeyMsg{
+		{Type: tea.KeyCtrlR},
+		{Type: tea.KeyUp},
+	} {
+		m.activeDialog = nil
+		_, cmd := m.handleCommandKey(keyMsg)
+		if cmd != nil {
+			t.Fatalf("%s should open history palette without returning a command", keyMsg.String())
+		}
+		if m.activeDialog == nil || !m.activeDialog.IsVisible() {
+			t.Fatalf("%s should open the filter palette", keyMsg.String())
+		}
 
-	_, action, _ := m.activeDialog.Update(tea.KeyMsg{Type: tea.KeyEnter})
-	if action.Kind != dialogs.ActionFilterApply {
-		t.Fatalf("enter action = %v, want ActionFilterApply", action.Kind)
-	}
-	if action.Pattern != "history-pattern" {
-		t.Fatalf("selected pattern = %q, want %q", action.Pattern, "history-pattern")
+		_, action, _ := m.activeDialog.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		if action.Kind != dialogs.ActionFilterApply {
+			t.Fatalf("%s enter action = %v, want ActionFilterApply", keyMsg.String(), action.Kind)
+		}
+		if action.Pattern != "history-pattern" {
+			t.Fatalf("%s selected pattern = %q, want %q", keyMsg.String(), action.Pattern, "history-pattern")
+		}
 	}
 }

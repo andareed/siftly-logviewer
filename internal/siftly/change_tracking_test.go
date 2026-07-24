@@ -80,6 +80,8 @@ func TestViewOperationsAreUndoableWithoutMakingDocumentDirty(t *testing.T) {
 
 func TestFrozenColumnIsTrackedByUndoAndDirtyState(t *testing.T) {
 	m := newChangeTrackingTestModel()
+	m.table.header[0].WrapLines = 4
+	m.initializeChangeTracking()
 	m.table.header[0].Frozen = true
 	m.recordChange("freeze column")
 	m.view.columnScrollOffset = 4
@@ -88,12 +90,24 @@ func TestFrozenColumnIsTrackedByUndoAndDirtyState(t *testing.T) {
 	}
 
 	_ = m.undoLastChange()
-	if m.table.header[0].Frozen || m.dirty || m.view.columnScrollOffset != 0 {
-		t.Fatalf("undo freeze: frozen=%t dirty=%t offset=%d", m.table.header[0].Frozen, m.dirty, m.view.columnScrollOffset)
+	if m.table.header[0].Frozen || m.table.header[0].WrapLines != 4 || m.dirty || m.view.columnScrollOffset != 0 {
+		t.Fatalf("undo freeze: column=%+v dirty=%t offset=%d", m.table.header[0], m.dirty, m.view.columnScrollOffset)
 	}
 	_ = m.redoLastChange()
-	if !m.table.header[0].Frozen || !m.dirty {
-		t.Fatalf("redo freeze: frozen=%t dirty=%t", m.table.header[0].Frozen, m.dirty)
+	if !m.table.header[0].Frozen || m.table.header[0].WrapLines != 4 || !m.dirty {
+		t.Fatalf("redo freeze: column=%+v dirty=%t", m.table.header[0], m.dirty)
+	}
+}
+
+func TestLegacyRecoveryStateRetainsCurrentSchemaWrapping(t *testing.T) {
+	m := newChangeTrackingTestModel()
+	m.table.header[0].WrapLines = 4
+	state := m.captureTrackedState()
+	state.Columns[0].WrapLines = 0
+
+	m.restoreTrackedState(state, false)
+	if got := m.table.header[0].WrapLines; got != 4 {
+		t.Fatalf("legacy recovery removed schema wrapping: WrapLines=%d", got)
 	}
 }
 
@@ -124,7 +138,7 @@ func TestQuitRequiresSecondPressWhenDirty(t *testing.T) {
 	}
 }
 
-func TestNormalModeHistoryPagingAndReloadKeys(t *testing.T) {
+func TestNormalModeHistoryAndPagingKeys(t *testing.T) {
 	m := newChangeTrackingTestModel()
 
 	tests := []struct {
@@ -136,7 +150,6 @@ func TestNormalModeHistoryPagingAndReloadKeys(t *testing.T) {
 		{name: "redo", msg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}}, want: viewActionRedo},
 		{name: "page up", msg: tea.KeyMsg{Type: tea.KeyCtrlU}, want: viewActionPageUp},
 		{name: "page down", msg: tea.KeyMsg{Type: tea.KeyCtrlD}, want: viewActionPageDown},
-		{name: "reload full source", msg: tea.KeyMsg{Type: tea.KeyCtrlR}, want: viewActionReloadFull},
 	}
 	for _, tt := range tests {
 		if got := m.resolveViewAction(tt.msg); got != tt.want {

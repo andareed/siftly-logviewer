@@ -60,8 +60,9 @@ func todaylogColumnSchema() siftly.ColumnSchema {
 		TimeParser:      parseTodaylogUnixSeconds,
 		RoleDefaults: map[ui.ColumnRole]siftly.RoleLayout{
 			RolePrimary: {
-				MinWidth: 40,
-				Weight:   6.0,
+				MinWidth:  40,
+				Weight:    6.0,
+				WrapLines: 4,
 			},
 			RoleSecondary: {
 				MinWidth: 12,
@@ -86,8 +87,9 @@ func todaylogColumnSchema() siftly.ColumnSchema {
 				Weight:   1.0,
 			},
 			"key": {
-				MinWidth: 40,
-				Weight:   6.0,
+				MinWidth:  40,
+				Weight:    6.0,
+				WrapLines: 4,
 			},
 			"value": {
 				MinWidth: 12,

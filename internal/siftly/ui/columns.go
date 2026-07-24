@@ -9,14 +9,15 @@ const (
 )
 
 type ColumnMeta struct {
-	Name     string
-	Index    int
-	Role     ColumnRole
-	Visible  bool
-	Frozen   bool
-	MinWidth int
-	Weight   float64
-	Width    int
+	Name      string
+	Index     int
+	Role      ColumnRole
+	Visible   bool
+	Frozen    bool
+	MinWidth  int
+	Weight    float64
+	Width     int
+	WrapLines int // resolved visual line budget; values below 2 render as one line
 }
 
 func LayoutColumns(cols []ColumnMeta, totalWidth int) []ColumnMeta {

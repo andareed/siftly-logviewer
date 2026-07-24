@@ -1,8 +1,6 @@
 package siftly
 
 import (
-	"time"
-
 	"github.com/andareed/siftly-hostlog/internal/shared/logging"
 	"github.com/andareed/siftly-hostlog/internal/siftly/features/dialogs"
 	"github.com/andareed/siftly-hostlog/internal/siftly/ui"
@@ -85,15 +83,16 @@ func (m *Model) InitialiseView() {
 		m.applyFilter()
 	}
 	m.initializeChangeTracking()
-	m.restoreRecoverySnapshot()
+	m.prepareRecoverySnapshot()
+	m.openRecoveryDialog()
 }
 
 func (m *Model) Init() tea.Cmd {
 	defer logging.TimeOperation("initial filter")()
 	m.applyFilter()
 	logging.Info("siftly-hostlog: Initialised")
-	if m.changes.recoveredOnStart {
-		return m.view.notice.Start("Recovered unsaved changes", "warn", 5*time.Second)
+	if m.activeDialog != nil && m.activeDialog.IsVisible() {
+		return m.activeDialog.Init()
 	}
 	return nil
 }

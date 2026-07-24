@@ -67,7 +67,6 @@ type viewState struct {
 	debugDesiredAboveHeight int
 	rowHeights              map[int]int
 	timeWindow              featuretimewindow.UIState
-	reloadFullConfirmUntil  time.Time
 	quitConfirmUntil        time.Time
 	rowRange                rowRangeSelection
 }

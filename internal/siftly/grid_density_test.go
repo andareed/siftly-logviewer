@@ -55,3 +55,41 @@ func TestDenseGridRendersModelRowsIntoViewport(t *testing.T) {
 		}
 	}
 }
+
+func TestWrappedGridRecalculatesRowHeightAfterResize(t *testing.T) {
+	m, err := NewModelFromRecords([][]string{
+		{"details"},
+		{"alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu"},
+	}, ColumnSchema{
+		DefaultMinWidth: 8,
+		RoleForName:     func(string) ui.ColumnRole { return ui.RolePrimary },
+		RoleDefaults: map[ui.ColumnRole]RoleLayout{
+			ui.RolePrimary: {MinWidth: 8, Weight: 1, WrapLines: 4},
+		},
+	})
+	if err != nil {
+		t.Fatalf("build model: %v", err)
+	}
+	m.SetStyles(ui.Styles{
+		Row:            lipgloss.NewStyle(),
+		RowSelected:    lipgloss.NewStyle(),
+		Cell:           lipgloss.NewStyle().Padding(0, 1),
+		RowTextFGColor: lipgloss.Color("#c0c0c0"),
+		RowSelectedFG:  lipgloss.Color("#e0e0e0"),
+		RowSelectedBG:  lipgloss.Color("#3a3a3a"),
+		DefaultMarker:  " ",
+	})
+	m.InitialiseView()
+	m.applyFilter()
+
+	m.recomputeLayout(24, 100)
+	_, wideHeight, ok := m.renderRowAt(0)
+	if !ok || wideHeight != 1 {
+		t.Fatalf("wide row height=%d ok=%t want 1", wideHeight, ok)
+	}
+	m.recomputeLayout(24, 30)
+	_, narrowHeight, ok := m.renderRowAt(0)
+	if !ok || narrowHeight <= wideHeight {
+		t.Fatalf("narrow row height=%d ok=%t want greater than %d", narrowHeight, ok, wideHeight)
+	}
+}
